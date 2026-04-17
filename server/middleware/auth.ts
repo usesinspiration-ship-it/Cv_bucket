@@ -70,8 +70,8 @@ export async function requireAuth(request: Request, _response: Response, next: N
       viewLimit: profile?.viewLimit || 0, // 0 means use global fallback
     }
     next()
-  } catch (error) {
-    console.error('Firebase token verification failed:', error)
-    next(new HttpError(401, 'Invalid or expired Firebase token.'))
+  } catch (error: any) {
+    console.error('[Auth Error] Firebase token verification failed:', error.code || error.message || error);
+    next(new HttpError(401, `Invalid or expired Firebase token: ${error.code || 'unknown'}`))
   }
 }

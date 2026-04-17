@@ -4,47 +4,61 @@ import { getAuth, Auth } from 'firebase-admin/auth'
 import { getFirestore, Firestore } from 'firebase-admin/firestore'
 import { env } from '../config/env.js'
 
+function cleanPrivateKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+  // Remove surrounding quotes if present
+  let cleaned = key.trim();
+  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+    cleaned = cleaned.substring(1, cleaned.length - 1);
+  }
+  // Replace literal \\n with actual newlines
+  return cleaned.replace(/\\n/g, '\n');
+}
+
 function getServiceAccount(): ServiceAccount | null {
+  console.log(`[Firebase Init] Environment: ${env.NODE_ENV}`);
+  console.log(`[Firebase Init] Project ID: ${env.FIREBASE_PROJECT_ID}`);
+
   if (env.FIREBASE_SERVICE_ACCOUNT_PATH) {
     if (!existsSync(env.FIREBASE_SERVICE_ACCOUNT_PATH)) {
-      console.error(
-        `\x1b[31mFirebase service account file not found at: ${env.FIREBASE_SERVICE_ACCOUNT_PATH}\x1b[0m`
-      )
-      return null
-    }
-    try {
-      return JSON.parse(readFileSync(env.FIREBASE_SERVICE_ACCOUNT_PATH, 'utf8')) as ServiceAccount
-    } catch (error) {
-      console.error(`\x1b[31mFailed to parse Firebase service account file: ${error}\x1b[0m`)
-      return null
+      console.warn(`[Firebase Init] Service account file not found: ${env.FIREBASE_SERVICE_ACCOUNT_PATH}`);
+    } else {
+      try {
+        console.log('[Firebase Init] Using Service Account File');
+        return JSON.parse(readFileSync(env.FIREBASE_SERVICE_ACCOUNT_PATH, 'utf8')) as ServiceAccount;
+      } catch (error) {
+        console.error(`[Firebase Init] File Parse Error: ${error}`);
+      }
     }
   }
 
   if (env.FIREBASE_SERVICE_ACCOUNT_KEY) {
     try {
-      const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_KEY) as ServiceAccount
-      if (sa.privateKey) {
-        sa.privateKey = sa.privateKey.replace(/\\n/g, '\n')
-      }
-      return sa
+      console.log('[Firebase Init] Using FIREBASE_SERVICE_ACCOUNT_KEY JSON');
+      const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_KEY) as ServiceAccount;
+      if (sa.privateKey) sa.privateKey = cleanPrivateKey(sa.privateKey)!;
+      return sa;
     } catch (error) {
-      console.error(`\x1b[31mFailed to parse FIREBASE_SERVICE_ACCOUNT_KEY: ${error}\x1b[0m`)
-      return null
+      console.error(`[Firebase Init] JSON Key Parse Error: ${error}`);
     }
   }
 
   if (env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
+    console.log(`[Firebase Init] Using CLIENT_EMAIL: ${env.FIREBASE_CLIENT_EMAIL}`);
+    const key = cleanPrivateKey(env.FIREBASE_PRIVATE_KEY);
+    if (!key || !key.includes('BEGIN PRIVATE KEY')) {
+      console.error('[Firebase Init] ERROR: PRIVATE_KEY format looks invalid (missing BEGIN header)');
+    }
+    
     return {
       projectId: env.FIREBASE_PROJECT_ID,
       clientEmail: env.FIREBASE_CLIENT_EMAIL,
-      privateKey: env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    }
+      privateKey: key,
+    };
   }
 
-  console.warn(
-    '\x1b[33mNo Firebase credentials provided. Provide FIREBASE_SERVICE_ACCOUNT_PATH, FIREBASE_SERVICE_ACCOUNT_KEY, or FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.\x1b[0m'
-  )
-  return null
+  console.warn('[Firebase Init] WARNING: No matching credentials found in environment variables.');
+  return null;
 }
 
 let firebaseApp = getApps()[0]
