@@ -15,6 +15,16 @@ const configuredOrigins = env.CLIENT_ORIGIN.split(',')
   .map((origin) => origin.trim().replace(/\/$/, '')) // Remove trailing slashes
   .filter(Boolean)
 
+// Production fallback for jkfenesta.com
+if (env.NODE_ENV === 'production') {
+  const defaults = ['https://jkfenesta.com', 'https://www.jkfenesta.com']
+  for (const origin of defaults) {
+    if (!configuredOrigins.includes(origin)) {
+      configuredOrigins.push(origin)
+    }
+  }
+}
+
 console.log(`[CORS] Whitelist initialized with origins: ${configuredOrigins.join(', ')}`)
 
 const isLocalDevOrigin = (origin: string) =>
