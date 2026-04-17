@@ -12,8 +12,10 @@ const __dirname = path.dirname(__filename)
 export const app = express()
 
 const configuredOrigins = env.CLIENT_ORIGIN.split(',')
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/$/, '')) // Remove trailing slashes
   .filter(Boolean)
+
+console.log(`[CORS] Whitelist initialized with origins: ${configuredOrigins.join(', ')}`)
 
 const isLocalDevOrigin = (origin: string) =>
   /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
@@ -29,21 +31,21 @@ app.use((req, _res, next) => {
 app.use(
   cors({
     origin: (origin, callback) => {
+      const normalizedOrigin = origin ? origin.replace(/\/$/, '') : undefined;
+
       // Allow browsers to preflight without origin or same-origin requests
-      if (!origin || configuredOrigins.includes(origin)) {
+      if (!normalizedOrigin || configuredOrigins.includes(normalizedOrigin)) {
         callback(null, true)
         return
       }
 
-      // Allow any origin that ends with the production base domain if needed
-      // but for now, we just stick to the whitelist
-      if (env.NODE_ENV !== 'production' && isLocalDevOrigin(origin)) {
+      if (env.NODE_ENV !== 'production' && isLocalDevOrigin(normalizedOrigin)) {
         callback(null, true)
         return
       }
 
-      console.warn(`[CORS Blocked] Origin: ${origin}`)
-      callback(new Error(`CORS blocked for origin: ${origin}`))
+      console.warn(`[CORS Blocked] Origin: ${normalizedOrigin} is not in whitelist: [${configuredOrigins.join(', ')}]`)
+      callback(null, false)
     },
     credentials: true,
   }),
