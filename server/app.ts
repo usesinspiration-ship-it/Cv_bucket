@@ -18,10 +18,8 @@ const configuredOrigins = env.CLIENT_ORIGIN.split(',')
 const isLocalDevOrigin = (origin: string) =>
   /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
 
-export const app = express()
-
 // Request logging for debugging production 404s
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   if (env.NODE_ENV !== 'test') {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`)
   }
