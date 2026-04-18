@@ -135,6 +135,28 @@ export function searchCvs(cvs: CvRecord[], filters: SearchFilters): CvRecord[] {
   })
 }
 
+export async function updateCvDocument(id: string, updates: Partial<CvRecord>): Promise<CvRecord | null> {
+  try {
+    const db = getFirestore()
+    const docRef = db.collection(COLLECTION_NAME).doc(id)
+    
+    // We don't want to allow updating certain fields like createdAt or id via this method
+    const { createdAt, id: _id, ...cleanUpdates } = updates as any
+    
+    await docRef.update(cleanUpdates)
+    const updatedDoc = await docRef.get()
+    
+    if (!updatedDoc.exists) {
+      return null
+    }
+    
+    return { id: updatedDoc.id, ...updatedDoc.data() } as CvRecord
+  } catch (error) {
+    console.error('Error updating CV:', error)
+    return null
+  }
+}
+
 export async function deleteCvById(id: string): Promise<void> {
   try {
     const db = getFirestore()

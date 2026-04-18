@@ -10,6 +10,7 @@ import {
   getCvById,
   listAllCvs,
   searchCvs,
+  updateCvDocument,
   type CvRecord,
 } from '../services/cvRepository.js'
 import { parseCvBuffer } from '../services/parserService.js'
@@ -225,4 +226,39 @@ function toIsoString(value: CvRecord['createdAt']) {
   }
 
   return new Date().toISOString()
+}
+
+const updateCvSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  phone: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  experience: z.string().optional(),
+  education: z.string().optional(),
+})
+
+export async function updateCv(request: Request, response: Response) {
+  if (!request.authUser) {
+    throw new HttpError(401, 'Authentication required.')
+  }
+
+  const { id } = z.object({ id: z.string() }).parse(request.params)
+  const updates = updateCvSchema.parse(request.body)
+
+  const existing = await getCvById(id)
+  if (!existing) {
+    throw new HttpError(404, 'CV not found.')
+  }
+
+  // Ensure user owns this CV or is admin
+  if (!request.authUser.isAdmin && existing.userId !== request.authUser.uid) {
+    throw new HttpError(403, 'You do not have permission to edit this CV.')
+  }
+
+  const updated = await updateCvDocument(id, updates)
+  if (!updated) {
+    throw new HttpError(500, 'Failed to update CV.')
+  }
+
+  response.json(await serializeCv(updated))
 }

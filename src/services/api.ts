@@ -46,6 +46,18 @@ export async function uploadCV(
   return response.data
 }
 
+export async function updateCV(
+  id: string,
+  updates: Partial<CVRecord>,
+  token: string,
+): Promise<CVRecord> {
+  const response = await api.patch<CVRecord>(`/cvs/${id}`, updates, {
+    headers: authHeaders(token),
+  })
+
+  return response.data
+}
+
 export async function deleteCV(id: string, token: string): Promise<void> {
   await api.delete(`/cvs/${id}`, {
     headers: authHeaders(token),

@@ -389,7 +389,15 @@ export function DashboardPage() {
               </div>
 
               <div className="hidden xl:block">
-                <CvDetailPanel cv={selectedCv} />
+                <CvDetailPanel
+                  cv={selectedCv}
+                  onUpdate={(updated) => {
+                    setItems((current) =>
+                      current.map((item) => (item.id === updated.id ? updated : item)),
+                    )
+                    setSelectedCv(updated)
+                  }}
+                />
               </div>
             </div>
           </section>
@@ -397,7 +405,15 @@ export function DashboardPage() {
 
         {activeTab === 'review' ? (
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
-            <CvDetailPanel cv={selectedCv} />
+            <CvDetailPanel
+              cv={selectedCv}
+              onUpdate={(updated) => {
+                setItems((current) =>
+                  current.map((item) => (item.id === updated.id ? updated : item)),
+                )
+                setSelectedCv(updated)
+              }}
+            />
             <div className="space-y-4">
               <div className="glass-panel p-4">
                 <p className="text-sm font-semibold text-slate-900">Actions</p>
