@@ -44,6 +44,7 @@ export function DashboardPage() {
   const [totalStorageBytes, setTotalStorageBytes] = useState(0)
   const [globalTotal, setGlobalTotal] = useState(0)
   const [isLimited, setIsLimited] = useState(false)
+  const [pendingEdit, setPendingEdit] = useState(false)
 
   const loadCVs = useCallback(async () => {
     if (!user) {
@@ -168,6 +169,12 @@ export function DashboardPage() {
     } catch (deleteError) {
       setError(getApiError(deleteError))
     }
+  }
+
+  async function handleQuickEdit(cv: CVRecord) {
+    setSelectedCv(cv)
+    setPendingEdit(true)
+    setActiveTab('review')
   }
 
   const totalPages = Math.max(1, Math.ceil(total / filters.pageSize))
@@ -345,6 +352,7 @@ export function DashboardPage() {
                         }
                       }}
                       onDelete={handleDelete}
+                      onEdit={handleQuickEdit}
                     />
                     <div className="glass-panel flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
                       <p className="text-slate-500">
@@ -391,12 +399,15 @@ export function DashboardPage() {
               <div className="hidden xl:block">
                 <CvDetailPanel
                   cv={selectedCv}
+                  autoEdit={pendingEdit}
                   onUpdate={(updated) => {
                     setItems((current) =>
                       current.map((item) => (item.id === updated.id ? updated : item)),
                     )
                     setSelectedCv(updated)
+                    setPendingEdit(false)
                   }}
+                  onCancel={() => setPendingEdit(false)}
                 />
               </div>
             </div>
@@ -407,12 +418,15 @@ export function DashboardPage() {
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
             <CvDetailPanel
               cv={selectedCv}
+              autoEdit={pendingEdit}
               onUpdate={(updated) => {
                 setItems((current) =>
                   current.map((item) => (item.id === updated.id ? updated : item)),
                 )
                 setSelectedCv(updated)
+                setPendingEdit(false)
               }}
+              onCancel={() => setPendingEdit(false)}
             />
             <div className="space-y-4">
               <div className="glass-panel p-4">

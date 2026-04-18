@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Check, Download, Edit2, Mail, Phone, Plus, UserRound, X } from 'lucide-react'
 import type { CVRecord } from '../types/cv'
 import { formatDate } from '../utils/format'
@@ -7,15 +7,23 @@ import { useAuth } from '../hooks/useAuth'
 
 interface CvDetailPanelProps {
   cv: CVRecord | null
+  autoEdit?: boolean
   onUpdate?: (updated: CVRecord) => void
+  onCancel?: () => void
 }
 
-export function CvDetailPanel({ cv, onUpdate }: CvDetailPanelProps) {
+export function CvDetailPanel({ cv, autoEdit, onUpdate, onCancel }: CvDetailPanelProps) {
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [editedData, setEditedData] = useState<Partial<CVRecord>>({})
   const [newSkill, setNewSkill] = useState('')
+
+  useEffect(() => {
+    if (autoEdit && cv && !isEditing) {
+      handleEdit()
+    }
+  }, [autoEdit, cv])
 
   if (!cv) {
     return (
@@ -40,6 +48,7 @@ export function CvDetailPanel({ cv, onUpdate }: CvDetailPanelProps) {
   const handleCancel = () => {
     setIsEditing(false)
     setEditedData({})
+    onCancel?.()
   }
 
   const handleSave = async () => {

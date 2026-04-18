@@ -1,4 +1,4 @@
-import { ExternalLink, Eye, Trash2 } from 'lucide-react'
+import { Edit2, ExternalLink, Eye, Trash2 } from 'lucide-react'
 import type { CVRecord } from '../types/cv'
 import { formatDate, formatFileSize, highlightText } from '../utils/format'
 
@@ -8,9 +8,10 @@ interface CvTableProps {
   query: string
   onSelect: (cv: CVRecord) => void
   onDelete: (cv: CVRecord) => Promise<void>
+  onEdit?: (cv: CVRecord) => void
 }
 
-export function CvTable({ items, selectedId, query, onSelect, onDelete }: CvTableProps) {
+export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit }: CvTableProps) {
   return (
     <div className="glass-panel overflow-hidden border-none shadow-panel">
       <div className="space-y-3 p-4 md:hidden">
@@ -62,6 +63,16 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete }: CvTabl
                 >
                   <Eye className="h-4 w-4" />
                 </button>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(cv)}
+                    className="btn-secondary h-10 w-10 p-0 text-brand-600 hover:border-brand-200 hover:bg-brand-50"
+                    aria-label={`Edit ${cv.name}`}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                )}
                 <a
                   href={cv.downloadUrl ?? cv.fileUrl}
                   target="_blank"
@@ -145,6 +156,16 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete }: CvTabl
                     >
                       <Eye className="h-4 w-4" />
                     </button>
+                    {onEdit && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(cv)}
+                        className="btn-secondary h-9 w-9 p-0 text-brand-600 hover:border-brand-200 hover:bg-brand-50"
+                        aria-label={`Edit ${cv.name}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    )}
                     <a
                       href={cv.downloadUrl ?? cv.fileUrl}
                       target="_blank"
