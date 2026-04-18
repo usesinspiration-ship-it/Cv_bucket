@@ -15,13 +15,11 @@ const configuredOrigins = env.CLIENT_ORIGIN.split(',')
   .map((origin) => origin.trim().replace(/\/$/, '')) // Remove trailing slashes
   .filter(Boolean)
 
-// Production fallback for jkfenesta.com
-if (env.NODE_ENV === 'production') {
-  const defaults = ['https://jkfenesta.com', 'https://www.jkfenesta.com']
-  for (const origin of defaults) {
-    if (!configuredOrigins.includes(origin)) {
-      configuredOrigins.push(origin)
-    }
+// Always allow the production client domains regardless of CLIENT_ORIGIN env var
+const permanentOrigins = ['https://jkfenesta.com', 'https://www.jkfenesta.com']
+for (const origin of permanentOrigins) {
+  if (!configuredOrigins.includes(origin)) {
+    configuredOrigins.push(origin)
   }
 }
 
@@ -55,7 +53,7 @@ app.use(
       }
 
       console.warn(`[CORS Blocked] Origin: ${normalizedOrigin} is not in whitelist: [${configuredOrigins.join(', ')}]`)
-      callback(null, false)
+      callback(new Error(`CORS: Origin ${normalizedOrigin} not allowed`), false)
     },
     credentials: true,
   }),
