@@ -4,19 +4,19 @@ import { useRef, useState } from 'react'
 interface UploadCardProps {
   busy: boolean
   progress: number
-  onUpload: (file: File) => Promise<void>
+  status?: string
+  onUpload: (files: File[]) => Promise<void>
 }
 
-export function UploadCard({ busy, progress, onUpload }: UploadCardProps) {
+export function UploadCard({ busy, progress, status, onUpload }: UploadCardProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  async function submitFile(file: File | undefined) {
-    if (!file || busy) {
+  async function submitFiles(files: FileList | null) {
+    if (!files || files.length === 0 || busy) {
       return
     }
-
-    await onUpload(file)
+    await onUpload(Array.from(files))
   }
 
   return (
@@ -45,7 +45,7 @@ export function UploadCard({ busy, progress, onUpload }: UploadCardProps) {
         onDrop={async (event) => {
           event.preventDefault()
           setIsDragging(false)
-          await submitFile(event.dataTransfer.files[0])
+          await submitFiles(event.dataTransfer.files)
         }}
         className={`group mt-6 flex min-h-64 w-full flex-col items-center justify-center rounded-[2rem] border-2 border-dashed transition-all duration-300 ${
           isDragging
@@ -68,23 +68,24 @@ export function UploadCard({ busy, progress, onUpload }: UploadCardProps) {
         </div>
         <p className="text-lg font-bold text-slate-900">
           {busy
-            ? 'Processing your CV'
+            ? (status || 'Processing your CV')
             : isDragging
               ? 'Drop it now!'
               : 'Drop CVs here or click to browse'}
         </p>
         <p className="mt-1 text-sm text-slate-500">
-          {busy ? 'Parsing content and extracting skills...' : 'We support PDF and Word resumes up to 10 MB'}
+          {busy ? 'Parsing content and extracting skills...' : 'Drop one or more resumes up to 10 MB each'}
         </p>
       </button>
 
       <input
         ref={inputRef}
         type="file"
+        multiple
         accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         className="hidden"
         onChange={async (event) => {
-          await submitFile(event.target.files?.[0])
+          await submitFiles(event.target.files)
           event.target.value = ''
         }}
       />
@@ -92,7 +93,7 @@ export function UploadCard({ busy, progress, onUpload }: UploadCardProps) {
       {busy && (
         <div className="mt-6 animate-fade-in">
           <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider">
-            <span className="text-slate-400">Processing Progress</span>
+            <span className="text-slate-400">{status || 'Processing Progress'}</span>
             <span className="text-brand-600">{progress}%</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/50">

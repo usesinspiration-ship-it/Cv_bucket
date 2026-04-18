@@ -38,6 +38,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState('')
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<DashboardTab>('library')
   const [totalStorageBytes, setTotalStorageBytes] = useState(0)
@@ -91,27 +92,61 @@ export function DashboardPage() {
     return () => window.clearTimeout(handle)
   }, [loadCVs])
 
-  async function handleUpload(file: File) {
-    if (!user) {
+  async function handleUpload(files: File[]) {
+    if (!user || files.length === 0) {
       return
     }
 
     setUploading(true)
-    setUploadProgress(0)
     setError('')
+    
+    let successCount = 0
+    let failureCount = 0
 
     try {
       const token = await user.getIdToken()
-      const created = await uploadCV(file, token, setUploadProgress)
-      setItems((current) => [created, ...current].slice(0, filters.pageSize))
-      setTotal((current) => current + 1)
-      setTotalStorageBytes((current) => current + created.fileSize)
-      setSelectedCv(created)
-      setActiveTab('review')
-    } catch (uploadError) {
-      setError(getApiError(uploadError))
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const displayIndex = i + 1
+        setUploadStatus(`Uploading ${file.name} (${displayIndex}/${files.length})`)
+        setUploadProgress(0)
+
+        try {
+          const created = await uploadCV(file, token, setUploadProgress)
+          successCount++
+          
+          // Optionally update local list for immediate feedback
+          if (files.length === 1) {
+            setItems((current) => [created, ...current].slice(0, filters.pageSize))
+            setTotal((current) => current + 1)
+            setTotalStorageBytes((current) => current + created.fileSize)
+            setSelectedCv(created)
+          }
+        } catch (uploadError) {
+          console.error(`Failed to upload ${file.name}:`, uploadError)
+          failureCount++
+        }
+      }
+
+      if (failureCount > 0) {
+        setError(`Completed with issues: ${successCount} successful, ${failureCount} failed.`)
+      } else if (files.length > 1) {
+        // Success message for bulk
+        setUploadStatus(`Successfully uploaded ${successCount} files.`)
+      }
+
+      if (successCount > 0 && files.length > 1) {
+        setActiveTab('library')
+      } else if (successCount > 0) {
+        setActiveTab('review')
+      }
+
+    } catch (generalError) {
+      setError(getApiError(generalError))
     } finally {
       setUploading(false)
+      setUploadStatus('')
       window.setTimeout(() => setUploadProgress(0), 400)
       await loadCVs()
     }
@@ -242,6 +277,7 @@ export function DashboardPage() {
             <UploadCard
               busy={uploading}
               progress={uploadProgress}
+              status={uploadStatus}
               onUpload={handleUpload}
             />
           </section>
