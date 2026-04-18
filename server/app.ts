@@ -1,6 +1,5 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import cors from 'cors'
 import express from 'express'
 import { env } from './config/env.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
@@ -11,24 +10,61 @@ const __dirname = path.dirname(__filename)
 
 export const app = express()
 
-const configuredOrigins = env.CLIENT_ORIGIN.split(',')
-  .map((origin) => origin.trim().replace(/\/$/, '')) // Remove trailing slashes
-  .filter(Boolean)
+// ─── Allowed Origins ──────────────────────────────────────────────────────────
+// Always include the production domain. CLIENT_ORIGIN may add more (comma-separated).
+const ALWAYS_ALLOWED = ['https://jkfenesta.com', 'https://www.jkfenesta.com']
 
-// Always allow the production client domains regardless of CLIENT_ORIGIN env var
-const permanentOrigins = ['https://jkfenesta.com', 'https://www.jkfenesta.com']
-for (const origin of permanentOrigins) {
-  if (!configuredOrigins.includes(origin)) {
-    configuredOrigins.push(origin)
+const allowedOrigins = new Set<string>([
+  ...ALWAYS_ALLOWED,
+  ...env.CLIENT_ORIGIN.split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean),
+])
+
+console.log(`[CORS] Allowed origins: ${[...allowedOrigins].join(', ')}`)
+
+// ─── CORS Middleware ───────────────────────────────────────────────────────────
+// Written as raw middleware so headers are always set correctly.
+// Works regardless of cors() package internals or env var values.
+app.use((req, res, next) => {
+  const origin = (req.headers.origin ?? '').replace(/\/$/, '')
+
+  const isAllowed =
+    !origin || // same-origin or no-origin requests (curl, server-to-server)
+    allowedOrigins.has(origin) ||
+    /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) // local dev
+
+  if (isAllowed && origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+    res.setHeader('Vary', 'Origin')
   }
-}
 
-console.log(`[CORS] Whitelist initialized with origins: ${configuredOrigins.join(', ')}`)
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    if (isAllowed) {
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+      res.setHeader('Access-Control-Max-Age', '600')
+      res.sendStatus(204)
+    } else {
+      console.warn(`[CORS Blocked] Preflight from: ${origin}`)
+      res.sendStatus(403)
+    }
+    return
+  }
 
-const isLocalDevOrigin = (origin: string) =>
-  /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
+  if (!isAllowed && origin) {
+    console.warn(`[CORS Blocked] Request from: ${origin}`)
+  }
 
-// Request logging for debugging production 404s
+  next()
+})
+
+// ─── Body Parsing ──────────────────────────────────────────────────────────────
+app.use(express.json({ limit: '2mb' }))
+
+// ─── Request Logging ───────────────────────────────────────────────────────────
 app.use((req, _res, next) => {
   if (env.NODE_ENV !== 'test') {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`)
@@ -36,30 +72,7 @@ app.use((req, _res, next) => {
   next()
 })
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      const normalizedOrigin = origin ? origin.replace(/\/$/, '') : undefined;
-
-      // Allow browsers to preflight without origin or same-origin requests
-      if (!normalizedOrigin || configuredOrigins.includes(normalizedOrigin)) {
-        callback(null, true)
-        return
-      }
-
-      if (env.NODE_ENV !== 'production' && isLocalDevOrigin(normalizedOrigin)) {
-        callback(null, true)
-        return
-      }
-
-      console.warn(`[CORS Blocked] Origin: ${normalizedOrigin} is not in whitelist: [${configuredOrigins.join(', ')}]`)
-      callback(new Error(`CORS: Origin ${normalizedOrigin} not allowed`), false)
-    },
-    credentials: true,
-  }),
-)
-app.use(express.json({ limit: '2mb' }))
-
+// ─── Routes ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (_request, response) => {
   response.json({
     ok: true,
