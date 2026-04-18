@@ -37,7 +37,7 @@ export async function uploadCv(request: Request, response: Response) {
   }
 
   if (!request.file) {
-    throw new HttpError(400, 'Attach a PDF file under the "file" field.')
+    throw new HttpError(400, 'Attach a PDF or Word file under the "file" field.')
   }
 
   const documentId = randomUUID()
@@ -51,7 +51,11 @@ export async function uploadCv(request: Request, response: Response) {
       contentType: request.file.mimetype,
     })
 
-    const parsed = await parseCvBuffer(request.file.buffer)
+    const parsed = await parseCvBuffer(
+      request.file.buffer,
+      request.file.mimetype,
+      request.file.originalname
+    )
     const created = await createCvDocument({
       id: documentId,
       userId: request.authUser.uid,

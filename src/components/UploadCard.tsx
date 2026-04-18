@@ -30,7 +30,7 @@ export function UploadCard({ busy, progress, onUpload }: UploadCardProps) {
         </div>
         <span className="tag">
           <FileUp className="mr-1.5 h-3.5 w-3.5" />
-          PDF only
+          PDF, DOC, DOCX
         </span>
       </div>
 
@@ -74,14 +74,14 @@ export function UploadCard({ busy, progress, onUpload }: UploadCardProps) {
               : 'Drop CVs here or click to browse'}
         </p>
         <p className="mt-1 text-sm text-slate-500">
-          {busy ? 'Parsing content and extracting skills...' : 'We support PDF resumes up to 10 MB'}
+          {busy ? 'Parsing content and extracting skills...' : 'We support PDF and Word resumes up to 10 MB'}
         </p>
       </button>
 
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         className="hidden"
         onChange={async (event) => {
           await submitFile(event.target.files?.[0])

@@ -26,11 +26,13 @@
     "firebase-admin": "^13.6.0",
     "fuse.js": "^7.1.0",
     "lucide-react": "^0.553.0",
+    "mammoth": "^1.12.0",
     "multer": "^2.0.2",
     "pdf-parse": "^1.1.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.6",
+    "word-extractor": "^1.0.4",
     "zod": "^4.1.12"
   },
   "devDependencies": {

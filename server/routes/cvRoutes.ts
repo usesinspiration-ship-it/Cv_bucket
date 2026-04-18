@@ -12,11 +12,14 @@ const upload = multer({
     fileSize: env.MAX_UPLOAD_SIZE_MB * 1024 * 1024,
   },
   fileFilter(_request, file, callback) {
-    const isPdf =
-      file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')
+    const isAllowed =
+      file.mimetype === 'application/pdf' ||
+      file.mimetype === 'application/msword' ||
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      /\.(pdf|doc|docx)$/i.test(file.originalname)
 
-    if (!isPdf) {
-      callback(new HttpError(400, 'Only PDF files are allowed.'))
+    if (!isAllowed) {
+      callback(new HttpError(400, 'Only PDF and Word files (.doc, .docx) are allowed.'))
       return
     }
 
