@@ -21,7 +21,7 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
   FIREBASE_SERVICE_ACCOUNT_KEY: z.string().optional(),
   ADMIN_EMAILS: z.string().default(''),
-  USER_VIEW_LIMIT: z.coerce.number().min(1).default(20),
+  USER_VIEW_LIMIT: z.coerce.number().min(0).default(0),
 })
 
 const parsed = envSchema.safeParse(process.env)

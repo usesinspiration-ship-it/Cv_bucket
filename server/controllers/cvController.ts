@@ -127,11 +127,14 @@ export async function listCvs(request: Request, response: Response) {
     // Use user-specific limit if set (> 0), otherwise use global default
     const limit = userSpecificLimit > 0 ? userSpecificLimit : globalLimit
     
-    console.log(`[View Limit] User ${request.authUser.email} (${request.authUser.uid}) is NOT admin. Limit applied: ${limit}`)
-    
-    if (filtered.length > limit) {
-      viewable = filtered.slice(0, limit)
-      isLimited = true
+    if (limit > 0) {
+      console.log(`[View Limit] User ${request.authUser.email} (${request.authUser.uid}) is NOT admin. Limit of ${limit} applied.`)
+      if (filtered.length > limit) {
+        viewable = filtered.slice(0, limit)
+        isLimited = true
+      }
+    } else {
+      console.log(`[View Limit] User ${request.authUser.email} (${request.authUser.uid}) is NOT admin, but has NO limit (unlimited).`)
     }
   } else {
     console.log(`[View Limit] User ${request.authUser.email} (${request.authUser.uid}) IS admin. No limit applied.`)
