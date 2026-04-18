@@ -60,10 +60,23 @@ export function CvDetailPanel({ cv, onUpdate }: CvDetailPanelProps) {
 
   const addSkill = () => {
     if (!newSkill.trim()) return
-    const skills = [...(editedData.skills || [])]
-    if (!skills.includes(newSkill.trim())) {
-      setEditedData({ ...editedData, skills: [...skills, newSkill.trim()] })
-    }
+    
+    // Split by comma and clean up duplicates
+    const addedSkills = newSkill
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s !== '')
+
+    const currentSkills = [...(editedData.skills || [])]
+    const updatedSkills = [...currentSkills]
+
+    addedSkills.forEach((skill) => {
+      if (!updatedSkills.includes(skill)) {
+        updatedSkills.push(skill)
+      }
+    })
+
+    setEditedData({ ...editedData, skills: updatedSkills })
     setNewSkill('')
   }
 

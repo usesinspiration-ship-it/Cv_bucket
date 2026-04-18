@@ -186,9 +186,10 @@ export async function deleteCv(request: Request, response: Response) {
 
   // Only the owner or an admin can delete
   const isOwner = cv.userId === request.authUser.uid
-  const isAdmin = request.authUser.isAdmin
+  const isAdmin = !!request.authUser.isAdmin
 
   if (!isOwner && !isAdmin) {
+    console.warn(`[Permission Denied] Delete attempt by ${request.authUser.email} (${request.authUser.uid}, admin:${isAdmin}) on CV ${cv.id} (Owner: ${cv.userId})`)
     throw new HttpError(403, 'You do not have permission to delete this CV.')
   }
 
@@ -252,6 +253,7 @@ export async function updateCv(request: Request, response: Response) {
 
   // Ensure user owns this CV or is admin
   if (!request.authUser.isAdmin && existing.userId !== request.authUser.uid) {
+    console.warn(`[Permission Denied] Update attempt by ${request.authUser.email} (${request.authUser.uid}, admin:${request.authUser.isAdmin}) on CV ${id} (Owner: ${existing.userId})`)
     throw new HttpError(403, 'You do not have permission to edit this CV.')
   }
 
