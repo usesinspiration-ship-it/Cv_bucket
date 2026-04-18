@@ -22,7 +22,6 @@ const envSchema = z.object({
   FIREBASE_SERVICE_ACCOUNT_KEY: z.string().optional(),
   ADMIN_EMAILS: z.string().default(''),
   USER_VIEW_LIMIT: z.coerce.number().min(1).default(5),
-  GEMINI_API_KEY: z.string().optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)
