@@ -1,10 +1,11 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { env } from '../config/env.js'
 import {
-  createCvDocument,
   deleteCvById,
+  findCvByHash,
+  findCvByPhone,
   getCvById,
   listAllCvs,
   searchCvs,
@@ -44,7 +45,16 @@ export async function uploadCv(request: Request, response: Response) {
   const sanitizedName = request.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '-')
   const objectKey = `${request.authUser.uid}/${documentId}-${sanitizedName}`
 
+  // Calculate file hash for duplicate detection
+  const fileHash = createHash('sha256').update(request.file.buffer).digest('hex')
+
   try {
+    // Check if this file already exists
+    const existing = await findCvByHash(fileHash)
+    if (existing) {
+      throw new HttpError(400, `This CV has already been uploaded as "${existing.fileName}".`)
+    }
+
     await uploadPdfToR2({
       key: objectKey,
       file: request.file.buffer,
@@ -56,6 +66,18 @@ export async function uploadCv(request: Request, response: Response) {
       request.file.mimetype,
       request.file.originalname
     )
+
+    // Check if this phone number already exists
+    if (parsed.phone) {
+      const normalizedPhone = parsed.phone.replace(/\D/g, '')
+      if (normalizedPhone) {
+        const existingByPhone = await findCvByPhone(parsed.phone)
+        if (existingByPhone) {
+          throw new HttpError(400, `A CV for this phone number (${parsed.phone}) already exists: "${existingByPhone.fileName}".`)
+        }
+      }
+    }
+
     const created = await createCvDocument({
       id: documentId,
       userId: request.authUser.uid,
@@ -70,6 +92,7 @@ export async function uploadCv(request: Request, response: Response) {
       experience: parsed.experience,
       education: parsed.education,
       rawText: parsed.rawText,
+      fileHash,
     })
 
     if (!created) {
@@ -104,10 +127,14 @@ export async function listCvs(request: Request, response: Response) {
     // Use user-specific limit if set (> 0), otherwise use global default
     const limit = userSpecificLimit > 0 ? userSpecificLimit : globalLimit
     
+    console.log(`[View Limit] User ${request.authUser.email} (${request.authUser.uid}) is NOT admin. Limit applied: ${limit}`)
+    
     if (filtered.length > limit) {
       viewable = filtered.slice(0, limit)
       isLimited = true
     }
+  } else {
+    console.log(`[View Limit] User ${request.authUser.email} (${request.authUser.uid}) IS admin. No limit applied.`)
   }
 
   const start = (filters.page - 1) * filters.pageSize

@@ -14,6 +14,7 @@ export interface CvRecord {
   experience: string
   education: string
   rawText: string
+  fileHash: string
   createdAt: Timestamp | Date | string | { _seconds?: number; _nanoseconds?: number }
 }
 
@@ -45,6 +46,36 @@ export async function getCvById(id: string): Promise<CvRecord | null> {
     return { id: doc.id, ...doc.data() } as CvRecord
   } catch (error) {
     console.error('Error getting CV by ID:', error)
+    return null
+  }
+}
+
+export async function findCvByHash(hash: string): Promise<CvRecord | null> {
+  try {
+    const db = getFirestore()
+    const snapshot = await db.collection(COLLECTION_NAME).where('fileHash', '==', hash).limit(1).get()
+    if (snapshot.empty) {
+      return null
+    }
+    const doc = snapshot.docs[0]
+    return { id: doc.id, ...doc.data() } as CvRecord
+  } catch (error) {
+    console.error('Error finding CV by hash:', error)
+    return null
+  }
+}
+
+export async function findCvByPhone(phone: string): Promise<CvRecord | null> {
+  try {
+    const db = getFirestore()
+    const snapshot = await db.collection(COLLECTION_NAME).where('phone', '==', phone).limit(1).get()
+    if (snapshot.empty) {
+      return null
+    }
+    const doc = snapshot.docs[0]
+    return { id: doc.id, ...doc.data() } as CvRecord
+  } catch (error) {
+    console.error('Error finding CV by phone:', error)
     return null
   }
 }
