@@ -117,12 +117,7 @@ export async function listCvs(request: Request, response: Response) {
   const { isAdmin } = authUser
   const filters = listQuerySchema.parse(request.query)
   const forceRefresh = (request.query as any).refresh === 'true'
-  const { 
-    items: allViewable, 
-    total: filteredCount,
-    globalStorageBytes,
-    globalTotal
-  } = await listCvsPaginated(filters, forceRefresh)
+  const { items: allViewable, total: filteredCount, totalStorageBytes: libraryTotalSize } = await listCvsPaginated(filters, forceRefresh)
 
   // Apply limit for non-admins
   let viewable = allViewable
@@ -148,9 +143,9 @@ export async function listCvs(request: Request, response: Response) {
     total: filteredCount,
     page: filters.page,
     pageSize: filters.pageSize,
-    totalStorageBytes: globalStorageBytes,
+    totalStorageBytes: libraryTotalSize,
     isLimited,
-    globalTotal: globalTotal,
+    globalTotal: filteredCount,
   })
 }
 

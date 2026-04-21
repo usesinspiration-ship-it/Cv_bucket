@@ -110,7 +110,7 @@ export async function listUserCvs(userId: string): Promise<CvRecord[]> {
 export async function listCvsPaginated(
   filters: SearchFilters, 
   forceRefresh = false
-): Promise<{ items: CvRecord[]; total: number; totalStorageBytes: number; globalStorageBytes: number; globalTotal: number }> {
+): Promise<{ items: CvRecord[]; total: number }> {
   try {
     const db = getFirestore()
     const now = Date.now()
@@ -133,30 +133,22 @@ export async function listCvsPaginated(
       lastCacheUpdate = now
     }
 
-    // Calculate global storage (of every item in the library)
-    // Heuristic: If fileSize is missing (legacy data), assume 500KB average per CV
-    const LEGACY_FILE_SIZE_BYTES = 500 * 1024
-    const globalStorageBytes = allItems.reduce((sum, cv) => sum + Number(cv.fileSize || LEGACY_FILE_SIZE_BYTES), 0)
-
     // In-memory filtering (always safe now that we have all items in cache or fresh fetch)
     const filtered = searchCvs(allItems, filters)
     
-    // Calculate storage of only the filtered items
-    const filteredStorageBytes = filtered.reduce((sum, cv) => sum + Number(cv.fileSize || LEGACY_FILE_SIZE_BYTES), 0)
-
     const start = (filters.page - 1) * filters.pageSize
     const paginated = filtered.slice(start, start + filters.pageSize)
+
+    const totalStorageBytes = allItems.reduce((sum, cv) => sum + (cv.fileSize || 0), 0)
 
     return {
       items: paginated,
       total: filtered.length,
-      totalStorageBytes: filteredStorageBytes,
-      globalStorageBytes,
-      globalTotal: allItems.length,
+      totalStorageBytes,
     }
   } catch (error) {
     console.error('Error listing paginated CVs:', error)
-    return { items: [], total: 0, totalStorageBytes: 0, globalStorageBytes: 0, globalTotal: 0 }
+    return { items: [], total: 0 }
   }
 }
 
