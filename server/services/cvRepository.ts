@@ -110,7 +110,7 @@ export async function listUserCvs(userId: string): Promise<CvRecord[]> {
 export async function listCvsPaginated(
   filters: SearchFilters, 
   forceRefresh = false
-): Promise<{ items: CvRecord[]; total: number; totalStorageBytes: number; globalStorageBytes: number }> {
+): Promise<{ items: CvRecord[]; total: number; totalStorageBytes: number; globalStorageBytes: number; globalTotal: number }> {
   try {
     const db = getFirestore()
     const now = Date.now()
