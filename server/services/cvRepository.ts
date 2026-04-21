@@ -1,4 +1,5 @@
 import { Timestamp, getFirestore } from 'firebase-admin/firestore'
+import { calculateR2BucketUsage } from './r2Service.js'
 
 export interface CvRecord {
   id: string
@@ -25,11 +26,14 @@ const COLLECTION_NAME = 'cvs'
 // Cache for CV records to save Firestore reads
 let cvCache: CvRecord[] | null = null
 let lastCacheUpdate = 0
+let cachedStorageBytes = 0
+let lastStorageUpdate = 0
 const DATA_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
 function invalidateCache() {
   cvCache = null
   lastCacheUpdate = 0
+  lastStorageUpdate = 0
 }
 
 export async function createCvDocument(data: Omit<CvRecord, 'createdAt'>): Promise<CvRecord | null> {
@@ -139,12 +143,19 @@ export async function listCvsPaginated(
     const start = (filters.page - 1) * filters.pageSize
     const paginated = filtered.slice(start, start + filters.pageSize)
 
-    const totalStorageBytes = allItems.reduce((sum, cv) => sum + (cv.fileSize || 0), 0)
+    // Handle Storage Calculation (Source of truth: Cloudflare R2)
+    const useStorageCache = !forceRefresh && lastStorageUpdate > 0 && (now - lastStorageUpdate < DATA_CACHE_TTL)
+    
+    if (!useStorageCache) {
+      console.log(`[R2] Recalculating actual bucket storage usage...`)
+      cachedStorageBytes = await calculateR2BucketUsage()
+      lastStorageUpdate = now
+    }
 
     return {
       items: paginated,
       total: filtered.length,
-      totalStorageBytes,
+      totalStorageBytes: cachedStorageBytes,
     }
   } catch (error) {
     console.error('Error listing paginated CVs:', error)

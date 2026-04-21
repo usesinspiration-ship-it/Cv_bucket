@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
@@ -60,4 +61,33 @@ export function createStoredFileUrl(key: string) {
   }
 
   return `r2://${env.R2_BUCKET}/${key}`
+}
+
+export async function calculateR2BucketUsage() {
+  let totalBytes = 0
+  let continuationToken: string | undefined
+
+  try {
+    do {
+      const response = await client.send(
+        new ListObjectsV2Command({
+          Bucket: env.R2_BUCKET,
+          ContinuationToken: continuationToken,
+        })
+      )
+
+      if (response.Contents) {
+        for (const obj of response.Contents) {
+          totalBytes += obj.Size || 0
+        }
+      }
+
+      continuationToken = response.NextContinuationToken
+    } while (continuationToken)
+
+    return totalBytes
+  } catch (error) {
+    console.error('[R2] Error calculating bucket usage:', error)
+    return 0
+  }
 }
