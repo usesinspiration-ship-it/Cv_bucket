@@ -65,6 +65,7 @@ export function createStoredFileUrl(key: string) {
 
 export async function calculateR2BucketUsage() {
   let totalBytes = 0
+  let objectCount = 0
   let continuationToken: string | undefined
 
   try {
@@ -77,6 +78,7 @@ export async function calculateR2BucketUsage() {
       )
 
       if (response.Contents) {
+        objectCount += response.Contents.length
         for (const obj of response.Contents) {
           totalBytes += obj.Size || 0
         }
@@ -87,7 +89,6 @@ export async function calculateR2BucketUsage() {
 
     return totalBytes
   } catch (error) {
-    console.error('[R2] Error calculating bucket usage:', error)
     return 0
   }
 }

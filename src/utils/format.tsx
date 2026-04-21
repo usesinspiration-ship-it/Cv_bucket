@@ -9,15 +9,18 @@ export function formatDate(value: string) {
 }
 
 export function formatFileSize(size: number) {
-  if (size < 1024) {
-    return `${size} B`
+  if (!size || size <= 0) return '0 B'
+  
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let unitIndex = 0
+  let scaledSize = size
+
+  while (scaledSize >= 1024 && unitIndex < units.length - 1) {
+    scaledSize /= 1024
+    unitIndex++
   }
 
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`
-  }
-
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  return `${scaledSize.toFixed(1)} ${units[unitIndex]}`
 }
 
 export function highlightText(text: string, query: string): ReactNode {
