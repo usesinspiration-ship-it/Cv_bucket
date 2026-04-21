@@ -133,8 +133,6 @@ export async function listCvsPaginated(
       lastCacheUpdate = now
     }
 
-    const isSearching = filters.query || filters.skill || filters.name
-    
     // In-memory filtering (always safe now that we have all items in cache or fresh fetch)
     const filtered = searchCvs(allItems, filters)
     
