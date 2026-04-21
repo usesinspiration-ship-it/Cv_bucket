@@ -110,7 +110,7 @@ export async function listUserCvs(userId: string): Promise<CvRecord[]> {
 export async function listCvsPaginated(
   filters: SearchFilters, 
   forceRefresh = false
-): Promise<{ items: CvRecord[]; total: number }> {
+): Promise<{ items: CvRecord[]; total: number; totalStorageBytes: number }> {
   try {
     const db = getFirestore()
     const now = Date.now()
@@ -148,7 +148,7 @@ export async function listCvsPaginated(
     }
   } catch (error) {
     console.error('Error listing paginated CVs:', error)
-    return { items: [], total: 0 }
+    return { items: [], total: 0, totalStorageBytes: 0 }
   }
 }
 
