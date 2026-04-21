@@ -1,6 +1,6 @@
 import { AlertCircle, FileText, RefreshCw, SearchCheck, TrendingUp, Upload, UserRoundSearch, Users } from 'lucide-react'
 import { StatCard } from '../components/StatCard'
-import { useDeferredValue, useEffect, useCallback, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useCallback, useMemo, useState, useRef } from 'react'
 import { CvDetailPanel } from '../components/CvDetailPanel'
 import { CvTable } from '../components/CvTable'
 import { EmptyState } from '../components/EmptyState'
@@ -45,13 +45,22 @@ export function DashboardPage() {
   const [globalTotal, setGlobalTotal] = useState(0)
   const [isLimited, setIsLimited] = useState(false)
   const [pendingEdit, setPendingEdit] = useState(false)
+  const [cooldownTime, setCooldownTime] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const loadingRef = useRef(false)
 
-  const loadCVs = useCallback(async () => {
-    if (!user) {
+  const loadCVs = useCallback(async (signal?: AbortSignal, refresh = false) => {
+    if (!user || loadingRef.current) {
+      return
+    }
+
+    if (Date.now() < cooldownTime) {
       return
     }
 
     setLoading(true)
+    loadingRef.current = true
     setError('')
 
     try {
@@ -65,6 +74,8 @@ export function DashboardPage() {
           pageSize: filters.pageSize,
         },
         token,
+        signal,
+        refresh,
       )
 
       const items = response?.items ?? []
@@ -79,18 +90,45 @@ export function DashboardPage() {
         null,
       )
     } catch (loadError) {
-      setError(getApiError(loadError))
+      const msg = getApiError(loadError)
+      if (msg === 'STALE_REQUEST') return
+      
+      setError(msg)
+      
+      // If it's a quota error, trigger 30s cooldown
+      if (msg.includes('Quota Exhausted')) {
+        setCooldownTime(Date.now() + 30000)
+      }
     } finally {
       setLoading(false)
+      loadingRef.current = false
+      setSyncing(false)
     }
-  }, [deferredName, deferredQuery, deferredSkill, filters.page, filters.pageSize, user])
+  }, [deferredName, deferredQuery, deferredSkill, filters.page, filters.pageSize, user?.uid, cooldownTime])
+
+  async function handleManualSync() {
+    if (loading || syncing) return
+    setSyncing(true)
+    await loadCVs(undefined, true)
+  }
 
   useEffect(() => {
+    // Cancel any in-flight requests before starting a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    abortControllerRef.current = new AbortController()
+
     const handle = window.setTimeout(() => {
-      void loadCVs()
+      void loadCVs(abortControllerRef.current?.signal)
     }, 250)
 
-    return () => window.clearTimeout(handle)
+    return () => {
+      window.clearTimeout(handle)
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [loadCVs])
 
   async function handleUpload(files: File[]) {
@@ -225,12 +263,12 @@ export function DashboardPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 type="button"
-                onClick={() => void loadCVs()}
+                onClick={handleManualSync}
                 className="btn-secondary h-12 px-5"
-                disabled={loading}
+                disabled={loading || syncing}
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                Sync Data
+                <RefreshCw className={`h-4 w-4 ${loading || syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync Data'}
               </button>
               <div className="h-10 w-px bg-slate-200 hidden sm:block mx-2" />
               <ProfileMenu />
@@ -350,6 +388,10 @@ export function DashboardPage() {
                         if (window.innerWidth < 1280) {
                           setActiveTab('review')
                         }
+                      }}
+                      onDoubleClick={(cv) => {
+                        setSelectedCv(cv)
+                        setActiveTab('review')
                       }}
                       onDelete={handleDelete}
                       onEdit={handleQuickEdit}

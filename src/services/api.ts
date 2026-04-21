@@ -15,10 +15,13 @@ function authHeaders(token: string) {
 export async function fetchCVs(
   filters: SearchFilters,
   token: string,
+  signal?: AbortSignal,
+  refresh = false,
 ): Promise<PaginatedCvResponse> {
   const response = await api.get<PaginatedCvResponse>('/cvs', {
     headers: authHeaders(token),
-    params: filters,
+    params: { ...filters, refresh },
+    signal,
   })
 
   return response.data
@@ -74,9 +77,17 @@ export function getApiError(error: unknown): string {
         ? error.response.data.message
         : undefined
 
+    if (responseMessage?.includes('RESOURCE_EXHAUSTED') || responseMessage?.includes('Quota exceeded')) {
+      return 'Firebase Free Tier Limit Reached (Daily Quota Exhausted). Please wait for the daily reset (Midnight UTC) or upgrade to Blaze plan.'
+    }
+
     return (
       responseMessage ?? error.message ?? 'Unexpected API request error.'
     )
+  }
+
+  if (error instanceof Error && error.name === 'CanceledError') {
+    return 'STALE_REQUEST' // Sentinel for canceled requests
   }
 
   return error instanceof Error ? error.message : 'Unexpected application error.'

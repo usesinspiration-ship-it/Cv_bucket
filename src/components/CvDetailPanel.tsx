@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Check, Download, Edit2, Mail, Phone, Plus, UserRound, X } from 'lucide-react'
+import { Banknote, Check, Download, Edit2, Mail, MapPin, Phone, Plus, UserRound, X } from 'lucide-react'
 import type { CVRecord } from '../types/cv'
 import { formatDate } from '../utils/format'
 import { updateCV } from '../services/api'
@@ -41,6 +41,8 @@ export function CvDetailPanel({ cv, autoEdit, onUpdate, onCancel }: CvDetailPane
       skills: [...(cv.skills || [])],
       experience: cv.experience || '',
       education: cv.education || '',
+      salary: cv.salary || '',
+      location: cv.location || '',
     })
     setIsEditing(true)
   }
@@ -181,6 +183,24 @@ export function CvDetailPanel({ cv, autoEdit, onUpdate, onCancel }: CvDetailPane
             value={isEditing ? editedData.phone : cv.phone}
             isEditing={isEditing}
             onChange={(val) => setEditedData({ ...editedData, phone: val })}
+          />
+        </div>
+        <div className="flex-1 min-w-[140px]">
+          <InfoCard 
+            icon={<MapPin className="h-4 w-4" />} 
+            label="Location" 
+            value={isEditing ? editedData.location : cv.location}
+            isEditing={isEditing}
+            onChange={(val) => setEditedData({ ...editedData, location: val })}
+          />
+        </div>
+        <div className="flex-1 min-w-[140px]">
+          <InfoCard 
+            icon={<Banknote className="h-4 w-4" />} 
+            label="Current Salary" 
+            value={isEditing ? editedData.salary : cv.salary}
+            isEditing={isEditing}
+            onChange={(val) => setEditedData({ ...editedData, salary: val })}
           />
         </div>
       </div>

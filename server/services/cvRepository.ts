@@ -15,10 +15,22 @@ export interface CvRecord {
   education: string
   rawText: string
   fileHash: string
+  salary?: string
+  location?: string
   createdAt: Timestamp | Date | string | { _seconds?: number; _nanoseconds?: number }
 }
 
 const COLLECTION_NAME = 'cvs'
+
+// Cache for CV records to save Firestore reads
+let cvCache: CvRecord[] | null = null
+let lastCacheUpdate = 0
+const DATA_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+
+function invalidateCache() {
+  cvCache = null
+  lastCacheUpdate = 0
+}
 
 export async function createCvDocument(data: Omit<CvRecord, 'createdAt'>): Promise<CvRecord | null> {
   try {
@@ -29,6 +41,7 @@ export async function createCvDocument(data: Omit<CvRecord, 'createdAt'>): Promi
       ...data,
       createdAt,
     })
+    invalidateCache()
     return { ...data, createdAt }
   } catch (error) {
     console.error('Error creating CV document:', error)
@@ -94,10 +107,55 @@ export async function listUserCvs(userId: string): Promise<CvRecord[]> {
   }
 }
 
-export async function listAllCvs(): Promise<CvRecord[]> {
+export async function listCvsPaginated(
+  filters: SearchFilters, 
+  forceRefresh = false
+): Promise<{ items: CvRecord[]; total: number }> {
   try {
     const db = getFirestore()
-    const snapshot = await db.collection(COLLECTION_NAME).get()
+    const now = Date.now()
+
+    // Decide if we should use the cache or re-fetch from Firestore
+    const useCache = !forceRefresh && cvCache && (now - lastCacheUpdate < DATA_CACHE_TTL)
+    
+    let allItems: CvRecord[] = []
+
+    if (useCache && cvCache) {
+      console.log('[Cache] Serving CVs from memory cache')
+      allItems = cvCache
+    } else {
+      console.log(`[Cache] Fetching CVs from Firestore (ForceRefresh: ${forceRefresh})`)
+      const snapshot = await db.collection(COLLECTION_NAME).orderBy('createdAt', 'desc').get()
+      allItems = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as CvRecord)
+      
+      // Update cache
+      cvCache = allItems
+      lastCacheUpdate = now
+    }
+
+    const isSearching = filters.query || filters.skill || filters.name
+    
+    // In-memory filtering (always safe now that we have all items in cache or fresh fetch)
+    const filtered = searchCvs(allItems, filters)
+    
+    const start = (filters.page - 1) * filters.pageSize
+    const paginated = filtered.slice(start, start + filters.pageSize)
+
+    return {
+      items: paginated,
+      total: filtered.length,
+    }
+  } catch (error) {
+    console.error('Error listing paginated CVs:', error)
+    return { items: [], total: 0 }
+  }
+}
+
+export async function listAllCvs(): Promise<CvRecord[]> {
+  // Still keep this but we should avoid using it in controllers
+  try {
+    const db = getFirestore()
+    const snapshot = await db.collection(COLLECTION_NAME).limit(100).get()
 
     return snapshot.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }) as CvRecord)
@@ -144,6 +202,7 @@ export async function updateCvDocument(id: string, updates: Partial<CvRecord>): 
     const { createdAt, id: _id, ...cleanUpdates } = updates as any
     
     await docRef.update(cleanUpdates)
+    invalidateCache()
     const updatedDoc = await docRef.get()
     
     if (!updatedDoc.exists) {
@@ -161,6 +220,7 @@ export async function deleteCvById(id: string): Promise<void> {
   try {
     const db = getFirestore()
     await db.collection(COLLECTION_NAME).doc(id).delete()
+    invalidateCache()
   } catch (error) {
     console.error('Error deleting CV:', error)
     throw error

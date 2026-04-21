@@ -6,6 +6,8 @@ interface ExtractedCvData {
   experience: string
   education: string
   rawText: string
+  salary: string
+  location: string
 }
 
 const commonSkills = [
@@ -96,7 +98,46 @@ export function extractCvData(rawText: string): ExtractedCvData {
     experience,
     education,
     rawText: normalizedText,
+    salary: extractSalary(normalizedText),
+    location: extractLocation(normalizedText, lines),
   }
+}
+
+function extractSalary(text: string) {
+  // Look for patterns like "Salary: $100k", "CTC: 15 LPA", "Current Salary: £50,000"
+  const patterns = [
+    /(?:salary|ctc|current salary|compensation)\s*[:|-]?\s*([$€£₹A-Z0-9.,/ ]+)/i,
+    /(\d+(?:\.\d+)?\s*(?:LPA|k|USD|GBP|EUR|INR|per annum|per year))/i
+  ]
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match && match[1]) {
+      const val = match[1].trim()
+      // Basic validation: length check to avoid capturing paragraphs
+      if (val.length > 1 && val.length < 30) return val
+    }
+  }
+  return ''
+}
+
+function extractLocation(text: string, lines: string[]) {
+  // Look for "Location: City, Country"
+  const locationMatch = text.match(/(?:location|address|residence|current city)\s*[:|-]?\s*([A-Z][a-z]+(?:\s*[A-Z][a-z]+)*(?:,\s*[A-Z][a-z]+)*)/i)
+  if (locationMatch && locationMatch[1]) {
+    return locationMatch[1].trim()
+  }
+
+  // Fallback: look for common location patterns near the top of the CV
+  // Usually in the first 10 lines, looking for something that looks like "City, Country"
+  const topLines = lines.slice(0, 10)
+  for (const line of topLines) {
+    if (line.includes(',') && /^[A-Z]/.test(line) && line.length < 40 && !line.includes('@')) {
+      return line
+    }
+  }
+
+  return ''
 }
 
 function extractName(lines: string[], email: string) {

@@ -13,6 +13,8 @@ export interface CVRecord {
   experience: string
   education: string
   rawText: string
+  salary?: string
+  location?: string
   createdAt: string
 }
 

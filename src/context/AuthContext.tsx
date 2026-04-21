@@ -24,8 +24,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser)
-      setLoading(false)
+      const checkAndSetUser = async () => {
+        // Frontend Whitelist Check
+        if (nextUser?.email) {
+          const allowedStr = import.meta.env.VITE_ALLOWED_EMAILS || ''
+          if (allowedStr) {
+            const allowed = allowedStr.split(',').map((e: string) => e.trim().toLowerCase())
+            if (!allowed.includes(nextUser.email.toLowerCase())) {
+              console.warn('[Auth] Redirecting unauthorized user:', nextUser.email)
+              await signOut(auth!)
+              setUser(null)
+              setLoading(false)
+              return
+            }
+          }
+        }
+        
+        setUser(nextUser)
+        setLoading(false)
+      }
+
+      void checkAndSetUser()
     })
 
     return unsubscribe
@@ -52,7 +71,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!auth || !googleProvider) {
           throw new Error(firebaseConfigError ?? 'Firebase is not configured.')
         }
-        await signInWithPopup(auth, googleProvider)
+        const result = await signInWithPopup(auth, googleProvider)
+        
+        // Immediate check for better UX
+        const userEmail = result.user.email?.toLowerCase() || ''
+        const allowedStr = import.meta.env.VITE_ALLOWED_EMAILS || ''
+        if (allowedStr) {
+          const allowed = allowedStr.split(',').map((e: string) => e.trim().toLowerCase())
+          if (!allowed.includes(userEmail)) {
+            await signOut(auth)
+            throw new Error('Your email is not authorized to access this system.')
+          }
+        }
       },
       async logout() {
         if (!auth) {

@@ -9,20 +9,22 @@ interface CvTableProps {
   onSelect: (cv: CVRecord) => void
   onDelete: (cv: CVRecord) => Promise<void>
   onEdit?: (cv: CVRecord) => void
+  onDoubleClick?: (cv: CVRecord) => void
 }
 
-export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit }: CvTableProps) {
+export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, onDoubleClick }: CvTableProps) {
   return (
     <div className="glass-panel overflow-hidden border-none shadow-panel">
       <div className="space-y-3 p-4 md:hidden">
         {items.map((cv) => (
           <article
             key={cv.id}
-            className={`rounded-3xl border p-5 transition-all duration-300 ${
+            className={`rounded-3xl border p-5 transition-all duration-300 cursor-pointer ${
               selectedId === cv.id
                 ? 'border-brand-500/30 bg-brand-500/5 shadow-glow'
                 : 'border-slate-100 bg-white/50 hover:bg-white hover:shadow-card'
             }`}
+            onDoubleClick={() => onDoubleClick?.(cv)}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -110,9 +112,10 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit }
             {items.map((cv) => (
               <tr
                 key={cv.id}
-                className={`group transition-all duration-300 hover:bg-white/80 ${
+                className={`group transition-all duration-300 hover:bg-white/80 cursor-pointer ${
                   selectedId === cv.id ? 'bg-brand-500/5' : ''
                 }`}
+                onDoubleClick={() => onDoubleClick?.(cv)}
               >
                 <td className="px-6 py-5">
                   <div className="flex flex-col gap-1.5">

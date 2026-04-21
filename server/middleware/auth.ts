@@ -4,6 +4,13 @@ import { env } from '../config/env.js'
 import { adminAuth } from '../services/firebaseAdmin.js'
 import { HttpError } from '../utils/httpError.js'
 
+// Simple in-memory cache for user profiles to save Firestore reads
+const profileCache = new Map<string, { profile: any; expires: number }>()
+const CACHE_TTL_MS = 60 * 1000 // 1 minute
+
+// Simple in-memory rate limiting (Burst Guard)
+const requestCounts = new Map<string, { count: number; lastReset: number }>()
+
 export async function requireAuth(request: Request, _response: Response, next: NextFunction) {
   if (!adminAuth) {
     next(
@@ -25,40 +32,84 @@ export async function requireAuth(request: Request, _response: Response, next: N
   const idToken = authorization.replace('Bearer ', '')
 
   try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken)
-    
-    // Fetch and sync profile in Firestore
-    const db = getFirestore()
-    const userDocRef = db.collection('users').doc(decodedToken.uid)
-    const userDoc = await userDocRef.get()
-    
-    let profile = userDoc.exists ? userDoc.data() : null
+    // Burst Guard: Limit to 5 requests per second per token (rough estimation)
+    const now = Date.now()
+    const rateLimitKey = idToken.slice(-20) // Use a portion of the token as key
+    const userLimit = requestCounts.get(rateLimitKey) || { count: 0, lastReset: now }
 
-    // Auto-create/sync user record
-    if (!profile || !profile.email) {
-      const adminEmails = env.ADMIN_EMAILS.split(',').map((email) => email.trim().toLowerCase())
-      const isConfiguredAdmin = !!decodedToken.email && adminEmails.includes(decodedToken.email.toLowerCase())
+    if (now - userLimit.lastReset > 1000) {
+      userLimit.count = 1
+      userLimit.lastReset = now
+    } else {
+      userLimit.count++
+    }
+    requestCounts.set(rateLimitKey, userLimit)
+
+    if (userLimit.count > 10) {
+      console.warn(`[Burst Guard] Rate limit exceeded for token ${rateLimitKey.slice(0, 5)}...`)
+      next(new HttpError(429, 'Too many requests. Please slow down.'))
+      return
+    }
+
+    const decodedToken = await adminAuth.verifyIdToken(idToken)
+
+    // Enforce Email Whitelist
+    const allowedEmailsStr = env.ALLOWED_EMAILS || ''
+    if (allowedEmailsStr) {
+      const allowedEmails = allowedEmailsStr.split(',').map((email) => email.trim().toLowerCase())
+      const userEmail = decodedToken.email?.toLowerCase() || ''
       
-      const newProfile = {
-        email: decodedToken.email || '',
-        displayName: decodedToken.name || '',
-        photoURL: decodedToken.picture || '',
-        role: profile?.role || (isConfiguredAdmin ? 'admin' : 'user'),
-        status: profile?.status || 'active',
-        permissions: {
-          canUpload: true,
-          canDownload: true,
-          canDelete: false,
-        },
-        visibility: {
-          level: 'own',
-        },
-        viewLimit: 0,
-        lastLogin: new Date().toISOString(),
+      if (!allowedEmails.includes(userEmail)) {
+        console.warn(`[Blocked Access] Unauthorized login attempt by ${userEmail}`)
+        next(new HttpError(403, 'Your email is not authorized to access this system. Please contact the administrator.'))
+        return
+      }
+    }
+    
+    // Check cache first
+    const cached = profileCache.get(decodedToken.uid)
+    
+    let profile = null
+    
+    if (cached && cached.expires > now) {
+      profile = cached.profile
+    } else {
+      // Fetch and sync profile in Firestore
+      const db = getFirestore()
+      const userDocRef = db.collection('users').doc(decodedToken.uid)
+      const userDoc = await userDocRef.get()
+      
+      profile = userDoc.exists ? userDoc.data() : null
+
+      // Auto-create/sync user record
+      if (!profile || !profile.email) {
+        const adminEmails = env.ADMIN_EMAILS.split(',').map((email) => email.trim().toLowerCase())
+        const isConfiguredAdmin = !!decodedToken.email && adminEmails.includes(decodedToken.email.toLowerCase())
+        
+        const newProfile = {
+          email: decodedToken.email || '',
+          displayName: decodedToken.name || '',
+          photoURL: decodedToken.picture || '',
+          role: profile?.role || (isConfiguredAdmin ? 'admin' : 'user'),
+          status: profile?.status || 'active',
+          permissions: {
+            canUpload: true,
+            canDownload: true,
+            canDelete: false,
+          },
+          visibility: {
+            level: 'own',
+          },
+          viewLimit: 0,
+          lastLogin: new Date().toISOString(),
+        }
+        
+        await userDocRef.set(newProfile, { merge: true })
+        profile = { ...(profile || {}), ...newProfile }
       }
       
-      await userDocRef.set(newProfile, { merge: true })
-      profile = { ...(profile || {}), ...newProfile }
+      // Update cache
+      profileCache.set(decodedToken.uid, { profile, expires: now + CACHE_TTL_MS })
     }
 
     // Determine admin status (Database first, then .env fallback)
