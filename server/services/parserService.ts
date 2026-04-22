@@ -65,7 +65,9 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     const jsonString = responseText.replace(/```json|```/g, '').trim()
     const aiData = JSON.parse(jsonString)
 
-    console.log('\x1b[32m%s\x1b[0m', `✨ [AI Parser] Gemini successfully extracted data for: ${aiData.name || 'Unnamed'}`)
+    console.log('\x1b[32m%s\x1b[0m', `✨ [AI Parser] Extracted for: ${aiData.name || 'Unnamed'}`)
+    console.log('\x1b[36m%s\x1b[0m', `📍 Location: ${aiData.location || 'None'}`)
+    console.log('\x1b[36m%s\x1b[0m', `🛠️ Skills: ${aiData.skills?.length || 0} detected`)
 
     return {
       ...aiData,
