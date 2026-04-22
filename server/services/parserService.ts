@@ -8,6 +8,7 @@ import { extractCvData } from '../utils/extractCvData.js'
 const genAI = new GoogleGenerativeAI(env.GOOGLE_API_KEY)
 
 export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?: string) {
+  console.log(`[Parser] Processing file: ${fileName || 'unknown'} (${mimetype || 'unknown type'})...`)
   let text = ''
 
   const isDocx =
@@ -58,14 +59,16 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     const response = await result.response
     const aiData = JSON.parse(response.text())
 
-    console.log(`[Parser] Gemini successfully parsed CV for: ${aiData.name}`)
+    console.log('\x1b[32m%s\x1b[0m', `✨ [AI Parser] Gemini successfully extracted data for: ${aiData.name || 'Unnamed'}`)
 
     return {
       ...aiData,
       rawText: text, // Always keep the full raw text for searching
     }
   } catch (error) {
-    console.error('[Parser] Gemini extraction failed, falling back to regex:', error)
-    return extractCvData(text)
+    console.error('\x1b[31m%s\x1b[0m', '❌ [AI Parser] Gemini failed, falling back to regex extraction:', error)
+    const fallbackData = extractCvData(text)
+    console.log('\x1b[33m%s\x1b[0m', '⚠️ [Parser] Local regex extraction complete.')
+    return fallbackData
   }
 }
