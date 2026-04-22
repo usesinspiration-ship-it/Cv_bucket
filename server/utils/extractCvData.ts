@@ -130,9 +130,12 @@ function extractLocation(text: string, lines: string[]) {
 
   // Fallback: look for common location patterns near the top of the CV
   // Usually in the first 10 lines, looking for something that looks like "City, Country"
-  const topLines = lines.slice(0, 10)
+  const topLines = lines.slice(0, 15)
   for (const line of topLines) {
-    if (line.includes(',') && /^[A-Z]/.test(line) && line.length < 40 && !line.includes('@')) {
+    // Skip lines that are likely just demographics (e.g., "Female, 22 years")
+    if (/female|male|years? old|\d+\s*years/i.test(line)) continue
+    
+    if (line.includes(',') && /^[A-Z]/.test(line) && line.length < 50 && !line.includes('@')) {
       return line
     }
   }

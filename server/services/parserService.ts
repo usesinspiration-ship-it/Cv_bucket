@@ -49,7 +49,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
       - experience: A concise summary of work history (2-3 sentences max)
       - education: A concise summary of educational background
       - salary: Any mentioned current salary or CTC (or empty string if not found)
-      - location: Current city/country/location
+      - location: City and State/Country if mentioned (otherwise null). Look closely at the top of the resume or contact section for city names, districts, or address patterns.
       
       Resume Text:
       ${text.slice(0, 30000)} // Safety limit for very large files
