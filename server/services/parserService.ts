@@ -59,8 +59,11 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     `
 
     const result = await model.generateContent(prompt)
-    const response = await result.response
-    const aiData = JSON.parse(response.text())
+    const responseText = result.response.text()
+    
+    // Clean up markdown markers if Gemini adds them
+    const jsonString = responseText.replace(/```json|```/g, '').trim()
+    const aiData = JSON.parse(jsonString)
 
     console.log('\x1b[32m%s\x1b[0m', `✨ [AI Parser] Gemini successfully extracted data for: ${aiData.name || 'Unnamed'}`)
 

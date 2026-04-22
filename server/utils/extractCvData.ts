@@ -123,16 +123,15 @@ function extractSalary(text: string) {
 
 function extractLocation(text: string, lines: string[]) {
   // Look for "Location: City, Country"
-  const locationMatch = text.match(/(?:location|address|residence|current city)\s*[:|-]?\s*([A-Z][a-z]+(?:\s*[A-Z][a-z]+)*(?:,\s*[A-Z][a-z]+)*)/i)
+  // Improved regex to handle lowercase words like 'nagar', 'road', 'gate'
+  const locationMatch = text.match(/(?:location|address|residence|current city)\s*[:|-]?\s*([A-Z0-9.\s,/-]+)/i)
   if (locationMatch && locationMatch[1]) {
-    return locationMatch[1].trim()
+    const val = locationMatch[1].split('\n')[0].trim()
+    if (val.length > 3 && val.length < 100) return val
   }
 
-  // Fallback: look for common location patterns near the top of the CV
-  // Usually in the first 10 lines, looking for something that looks like "City, Country"
   const topLines = lines.slice(0, 15)
   for (const line of topLines) {
-    // Skip lines that are likely just demographics (e.g., "Female, 22 years")
     if (/female|male|years? old|\d+\s*years/i.test(line)) continue
     
     if (line.includes(',') && /^[A-Z]/.test(line) && line.length < 50 && !line.includes('@')) {
@@ -140,7 +139,7 @@ function extractLocation(text: string, lines: string[]) {
     }
   }
 
-  // Final Safety Net: Scan for common city names anywhere in the text
+  // Final Safety Net: Scan for common city names and major suburbs anywhere in the text
   const commonCities = [
     'Mumbai', 'Pune', 'Delhi', 'Bangalore', 'Bengaluru', 'Hyderabad', 
     'Chennai', 'Kolkata', 'Ahmedabad', 'Surat', 'Jaipur', 'Lucknow', 
@@ -149,7 +148,9 @@ function extractLocation(text: string, lines: string[]) {
     'Agra', 'Madurai', 'Nashik', 'Vijayawada', 'Faridabad', 'Meerut', 
     'Rajkot', 'Kalyan', 'Vasai', 'Varanasi', 'Srinagar', 'Aurangabad', 
     'Dhanbad', 'Amritsar', 'Navi Mumbai', 'Allahabad', 'Ranchi', 'Howrah', 
-    'Jabalpur', 'Gwalior', 'Jodhpur', 'Raipur', 'Kota', 'Guwahati'
+    'Jabalpur', 'Gwalior', 'Jodhpur', 'Raipur', 'Kota', 'Guwahati',
+    'Malad', 'Andheri', 'Borivali', 'Bandra', 'Goregaon', 'Kandivali', 
+    'Dahisar', 'Kurla', 'Chembur', 'Ghatkopar', 'Mulund', 'Dadar', 'Worli'
   ]
 
   for (const city of commonCities) {
