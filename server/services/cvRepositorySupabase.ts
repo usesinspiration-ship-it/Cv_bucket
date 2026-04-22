@@ -149,11 +149,15 @@ export async function listCvsPaginated(
     const from = (filters.page - 1) * filters.pageSize
     const to = from + filters.pageSize - 1
 
+    const startTime = performance.now()
     const { data, count, error } = await queryBuilder
       .order('createdAt', { ascending: false })
       .range(from, to)
+    const duration = (performance.now() - startTime).toFixed(2)
 
     if (error) throw error
+
+    console.log(`⏱️ [Supabase] listCvsPaginated took ${duration}ms (total: ${count})`)
 
     // 3. Handle Storage Calculation (Shared R2 Logic)
     const useStorageCache = !forceRefresh && lastStorageUpdate > 0 && (now - lastStorageUpdate < DATA_CACHE_TTL)
