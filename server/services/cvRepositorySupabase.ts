@@ -129,8 +129,12 @@ export async function listCvsPaginated(
       .select('id, userId, fileUrl, objectKey, fileName, fileSize, name, email, phone, skills, experience, education, fileHash, salary, location, createdAt, rawText', { count: 'exact' })
 
     if (filters.query) {
-      // Search across name, email, and rawText
-      queryBuilder = queryBuilder.or(`name.ilike.%${filters.query}%,email.ilike.%${filters.query}%,rawText.ilike.%${filters.query}%`)
+      // Use PostgreSQL Full-Text Search on the generated search_vector column
+      // 'plainto_tsquery' handles multi-word queries gracefully
+      queryBuilder = queryBuilder.textSearch('search_vector', filters.query, {
+        type: 'plain',
+        config: 'english'
+      })
     }
 
     if (filters.name) {
