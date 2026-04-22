@@ -41,18 +41,21 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
 
     const prompt = `
       Extract professional details from the following resume text. 
-      Return the data strictly in JSON format with these keys:
-      - name: Full name of the candidate
-      - email: Primary email address
-      - phone: Primary phone number
+      
+      Extraction Rules:
+      - name: Full name (usually at the very top)
+      - email: Email address
+      - phone: Phone number
       - skills: Array of top 10-15 technical skills or core competencies
       - experience: A concise summary of work history (2-3 sentences max)
       - education: A concise summary of educational background
       - salary: Any mentioned current salary or CTC (or empty string if not found)
-      - location: City and State/Country if mentioned (otherwise null). Look closely at the top of the resume or contact section for city names, districts, or address patterns.
+      - location: Look for city names (e.g. Mumbai, Delhi, Bangalore), pin codes (6 digits), or address strings. Check the header AND the 'Place' section at the bottom. Clean up squashed words like 'MUMBAISIGNATURE' to just 'Mumbai'.
+      
+      Return the data strictly in JSON format.
       
       Resume Text:
-      ${text.slice(0, 30000)} // Safety limit for very large files
+      ${text.slice(0, 30000)}
     `
 
     const result = await model.generateContent(prompt)
