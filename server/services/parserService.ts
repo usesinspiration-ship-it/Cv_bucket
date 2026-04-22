@@ -35,7 +35,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
   // ─── AI Extraction ───────────────────────────────────────────────────────────
   try {
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-flash-latest',
       generationConfig: { responseMimeType: 'application/json' }
     })
 
