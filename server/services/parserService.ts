@@ -1,7 +1,11 @@
 import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 import WordExtractor from 'word-extractor'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { env } from '../config/env.js'
 import { extractCvData } from '../utils/extractCvData.js'
+
+const genAI = new GoogleGenerativeAI(env.GOOGLE_API_KEY)
 
 export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?: string) {
   let text = ''
@@ -27,5 +31,41 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     text = parsed.text
   }
 
-  return extractCvData(text)
+  // ─── AI Extraction ───────────────────────────────────────────────────────────
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: { responseMimeType: 'application/json' }
+    })
+
+    const prompt = `
+      Extract professional details from the following resume text. 
+      Return the data strictly in JSON format with these keys:
+      - name: Full name of the candidate
+      - email: Primary email address
+      - phone: Primary phone number
+      - skills: Array of top 10-15 technical skills or core competencies
+      - experience: A concise summary of work history (2-3 sentences max)
+      - education: A concise summary of educational background
+      - salary: Any mentioned current salary or CTC (or empty string if not found)
+      - location: Current city/country/location
+      
+      Resume Text:
+      ${text.slice(0, 30000)} // Safety limit for very large files
+    `
+
+    const result = await model.generateContent(prompt)
+    const response = await result.response
+    const aiData = JSON.parse(response.text())
+
+    console.log(`[Parser] Gemini successfully parsed CV for: ${aiData.name}`)
+
+    return {
+      ...aiData,
+      rawText: text, // Always keep the full raw text for searching
+    }
+  } catch (error) {
+    console.error('[Parser] Gemini extraction failed, falling back to regex:', error)
+    return extractCvData(text)
+  }
 }

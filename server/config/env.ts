@@ -25,6 +25,7 @@ const envSchema = z.object({
   USER_VIEW_LIMIT: z.coerce.number().min(0).default(0),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  GOOGLE_API_KEY: z.string().min(1),
 })
 
 const parsed = envSchema.safeParse(process.env)
