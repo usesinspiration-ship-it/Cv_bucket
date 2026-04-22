@@ -93,6 +93,8 @@ export async function uploadCv(request: Request, response: Response) {
       skills: parsed.skills,
       experience: parsed.experience,
       education: parsed.education,
+      location: parsed.location,
+      salary: parsed.salary,
       rawText: parsed.rawText,
       fileHash,
     })
