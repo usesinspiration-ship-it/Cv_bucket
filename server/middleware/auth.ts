@@ -58,6 +58,7 @@ export async function requireAuth(request: Request, _response: Response, next: N
     if (allowedEmailsStr) {
       const allowedEmails = allowedEmailsStr.split(',').map((email) => email.trim().toLowerCase())
       const userEmail = decodedToken.email?.toLowerCase() || ''
+      console.log(`[Auth Check] User: "${userEmail}" | Whitelist: ${JSON.stringify(allowedEmails)}`)
       
       if (!allowedEmails.includes(userEmail)) {
         console.warn(`[Blocked Access] Unauthorized login attempt by ${userEmail}`)
