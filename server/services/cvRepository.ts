@@ -28,7 +28,7 @@ let cvCache: CvRecord[] | null = null
 let lastCacheUpdate = 0
 let cachedStorageBytes = 0
 let lastStorageUpdate = 0
-const DATA_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+const DATA_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours (Manual Sync priority)
 
 function invalidateCache() {
   cvCache = null

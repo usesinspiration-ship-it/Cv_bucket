@@ -6,7 +6,7 @@ import { HttpError } from '../utils/httpError.js'
 
 // Simple in-memory cache for user profiles to save Firestore reads
 const profileCache = new Map<string, { profile: any; expires: number }>()
-const CACHE_TTL_MS = 60 * 1000 // 1 minute
+const CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes (Profile Cache)
 
 // Simple in-memory rate limiting (Burst Guard)
 const requestCounts = new Map<string, { count: number; lastReset: number }>()

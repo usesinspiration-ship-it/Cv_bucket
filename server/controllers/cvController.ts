@@ -11,7 +11,7 @@ import {
   listCvsPaginated,
   updateCvDocument,
   type CvRecord,
-} from '../services/cvRepository.js'
+} from '../services/cvRepositorySupabase.js'
 import { parseCvBuffer } from '../services/parserService.js'
 import {
   createDownloadUrl,
@@ -202,7 +202,7 @@ async function serializeCv(cv: CvRecord) {
   }
 }
 
-function toIsoString(value: CvRecord['createdAt']) {
+function toIsoString(value: any) {
   if (typeof value === 'string') {
     return value
   }

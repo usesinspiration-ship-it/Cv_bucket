@@ -104,7 +104,7 @@ export function DashboardPage() {
       loadingRef.current = false
       setSyncing(false)
     }
-  }, [deferredName, deferredQuery, deferredSkill, filters.page, filters.pageSize, user?.uid, cooldownTime])
+  }, [deferredName, deferredQuery, deferredSkill, filters.page, filters.pageSize, user?.uid])
 
   async function handleManualSync() {
     if (loading || syncing) return
@@ -119,6 +119,11 @@ export function DashboardPage() {
     }
     abortControllerRef.current = new AbortController()
 
+    // Don't even try to load if we are in a quota cooldown
+    if (Date.now() < cooldownTime) {
+      return
+    }
+
     const handle = window.setTimeout(() => {
       void loadCVs(abortControllerRef.current?.signal)
     }, 250)
@@ -129,7 +134,7 @@ export function DashboardPage() {
         abortControllerRef.current.abort()
       }
     }
-  }, [loadCVs])
+  }, [loadCVs]) // loadCVs no longer depends on cooldownTime directly in a way that loops
 
   async function handleUpload(files: File[]) {
     if (!user || files.length === 0) {
