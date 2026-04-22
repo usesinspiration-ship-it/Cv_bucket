@@ -50,7 +50,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
       - experience: A concise summary of work history (2-3 sentences max)
       - education: A concise summary of educational background
       - salary: Any mentioned current salary or CTC (or empty string if not found)
-      - location: Look for city names (e.g. Mumbai, Delhi, Bangalore), pin codes (6 digits), or address strings. Check the header AND the 'Place' section at the bottom. Clean up squashed words like 'MUMBAISIGNATURE' to just 'Mumbai'.
+      - location: Find ANY mention of a city, town, or residence. If no clear address is present, scan the whole text for city names (e.g., Mumbai, Pune, Delhi, etc.) and use the most prominent one. Clean up any squashed text like 'MUMBAISIGNATURE'.
       
       Return the data strictly in JSON format.
       

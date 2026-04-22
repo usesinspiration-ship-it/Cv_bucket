@@ -140,6 +140,24 @@ function extractLocation(text: string, lines: string[]) {
     }
   }
 
+  // Final Safety Net: Scan for common city names anywhere in the text
+  const commonCities = [
+    'Mumbai', 'Pune', 'Delhi', 'Bangalore', 'Bengaluru', 'Hyderabad', 
+    'Chennai', 'Kolkata', 'Ahmedabad', 'Surat', 'Jaipur', 'Lucknow', 
+    'Kanpur', 'Nagpur', 'Indore', 'Thane', 'Bhopal', 'Visakhapatnam', 
+    'Pimpri', 'Patna', 'Vadodara', 'Ghaziabad', 'Ludhiana', 'Coimbatore', 
+    'Agra', 'Madurai', 'Nashik', 'Vijayawada', 'Faridabad', 'Meerut', 
+    'Rajkot', 'Kalyan', 'Vasai', 'Varanasi', 'Srinagar', 'Aurangabad', 
+    'Dhanbad', 'Amritsar', 'Navi Mumbai', 'Allahabad', 'Ranchi', 'Howrah', 
+    'Jabalpur', 'Gwalior', 'Jodhpur', 'Raipur', 'Kota', 'Guwahati'
+  ]
+
+  for (const city of commonCities) {
+    if (new RegExp(`\\b${city}\\b`, 'i').test(text)) {
+      return city
+    }
+  }
+
   return ''
 }
 
