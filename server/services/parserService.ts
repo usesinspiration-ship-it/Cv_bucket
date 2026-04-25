@@ -59,10 +59,10 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
   // ─── Try Groq First (Fastest & High Quota) ──────────────────────────────────
   if (groq) {
     try {
-      console.log('🚀 [Parser] Attempting Groq extraction (Llama 3.1)...')
+      console.log('🚀 [Parser] Attempting Groq extraction (Llama 3.3)...')
       const completion = await groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
-        model: 'llama-3.1-70b-versatile',
+        model: 'llama-3.3-70b-versatile',
         response_format: { type: 'json_object' },
       })
 
@@ -77,7 +77,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
   try {
     console.log('♊ [Parser] Attempting Gemini extraction...')
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-1.5-flash-latest',
       generationConfig: { responseMimeType: 'application/json' }
     })
 
