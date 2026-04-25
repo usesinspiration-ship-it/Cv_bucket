@@ -34,11 +34,32 @@ let cachedStorageBytes = 0
 let lastStorageUpdate = 0
 const DATA_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
 
+/**
+ * Sanitizes a value by removing null bytes (\u0000) which PostgreSQL does not support in text/jsonb fields.
+ */
+function sanitizeForPostgres(val: any): any {
+  if (typeof val === 'string') {
+    return val.replace(/\u0000/g, '')
+  }
+  if (Array.isArray(val)) {
+    return val.map(sanitizeForPostgres)
+  }
+  if (typeof val === 'object' && val !== null) {
+    const sanitized: any = {}
+    for (const [key, value] of Object.entries(val)) {
+      sanitized[key] = sanitizeForPostgres(value)
+    }
+    return sanitized
+  }
+  return val
+}
+
 export async function createCvDocument(data: Omit<CvRecord, 'createdAt'>): Promise<CvRecord | null> {
   try {
+    const sanitizedData = sanitizeForPostgres(data)
     const { data: record, error } = await supabase
       .from('cvs')
-      .insert({ ...data, createdAt: new Date().toISOString() })
+      .insert({ ...sanitizedData, createdAt: new Date().toISOString() })
       .select()
       .single()
 
@@ -194,9 +215,10 @@ export async function listAllCvs(): Promise<CvRecord[]> {
 
 export async function updateCvDocument(id: string, updates: Partial<CvRecord>): Promise<CvRecord | null> {
   try {
+    const sanitizedUpdates = sanitizeForPostgres(updates)
     const { data, error } = await supabase
       .from('cvs')
-      .update(updates)
+      .update(sanitizedUpdates)
       .eq('id', id)
       .select()
       .single()

@@ -2,10 +2,12 @@ import pdfParse from 'pdf-parse'
 import mammoth from 'mammoth'
 import WordExtractor from 'word-extractor'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 import { env } from '../config/env.js'
 import { extractCvData } from '../utils/extractCvData.js'
 
 const genAI = new GoogleGenerativeAI(env.GOOGLE_API_KEY)
+const groq = env.GROQ_API_KEY ? new Groq({ apiKey: env.GROQ_API_KEY }) : null
 
 export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?: string) {
   console.log(`[Parser] Processing file: ${fileName || 'unknown'} (${mimetype || 'unknown type'})...`)
@@ -32,51 +34,74 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     text = parsed.text
   }
 
-  // ─── AI Extraction ───────────────────────────────────────────────────────────
+  // Clean the text immediately (remove null bytes and other illegal Postgres characters)
+  text = text.replace(/\u0000/g, '')
+
+  const prompt = `
+    Extract professional details from the following resume text. 
+    
+    Extraction Rules:
+    - name: Full name (usually at the very top)
+    - email: Email address
+    - phone: Phone number
+    - skills: Array of top 10-15 technical skills or core competencies
+    - experience: A concise summary of work history (2-3 sentences max)
+    - education: A concise summary of educational background
+    - salary: Any mentioned current salary or CTC (or empty string if not found)
+    - location: Find ANY mention of a city, town, or residence. If no clear address is present, scan the whole text for city names (e.g., Mumbai, Pune, Delhi, etc.) and use the most prominent one. Clean up any squashed text like 'MUMBAISIGNATURE'.
+    
+    Return the data strictly in JSON format.
+    
+    Resume Text:
+    ${text.slice(0, 30000)}
+  `
+
+  // ─── Try Groq First (Fastest & High Quota) ──────────────────────────────────
+  if (groq) {
+    try {
+      console.log('🚀 [Parser] Attempting Groq extraction (Llama 3.1)...')
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.1-70b-versatile',
+        response_format: { type: 'json_object' },
+      })
+
+      const aiData = JSON.parse(completion.choices[0]?.message?.content || '{}')
+      return logAndReturn(aiData, text, 'Groq')
+    } catch (error) {
+      console.error('⚠️ [Parser] Groq failed, trying Gemini...', (error as any).message)
+    }
+  }
+
+  // ─── Try Gemini (Fallback) ──────────────────────────────────────────────────
   try {
+    console.log('♊ [Parser] Attempting Gemini extraction...')
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-flash-latest',
+      model: 'gemini-1.5-flash',
       generationConfig: { responseMimeType: 'application/json' }
     })
 
-    const prompt = `
-      Extract professional details from the following resume text. 
-      
-      Extraction Rules:
-      - name: Full name (usually at the very top)
-      - email: Email address
-      - phone: Phone number
-      - skills: Array of top 10-15 technical skills or core competencies
-      - experience: A concise summary of work history (2-3 sentences max)
-      - education: A concise summary of educational background
-      - salary: Any mentioned current salary or CTC (or empty string if not found)
-      - location: Find ANY mention of a city, town, or residence. If no clear address is present, scan the whole text for city names (e.g., Mumbai, Pune, Delhi, etc.) and use the most prominent one. Clean up any squashed text like 'MUMBAISIGNATURE'.
-      
-      Return the data strictly in JSON format.
-      
-      Resume Text:
-      ${text.slice(0, 30000)}
-    `
-
     const result = await model.generateContent(prompt)
     const responseText = result.response.text()
-    
-    // Clean up markdown markers if Gemini adds them
     const jsonString = responseText.replace(/```json|```/g, '').trim()
     const aiData = JSON.parse(jsonString)
 
-    console.log('\x1b[32m%s\x1b[0m', `✨ [AI Parser] Extracted for: ${aiData.name || 'Unnamed'}`)
-    console.log('\x1b[36m%s\x1b[0m', `📍 Location: ${aiData.location || 'None'}`)
-    console.log('\x1b[36m%s\x1b[0m', `🛠️ Skills: ${aiData.skills?.length || 0} detected`)
-
-    return {
-      ...aiData,
-      rawText: text, // Always keep the full raw text for searching
-    }
+    return logAndReturn(aiData, text, 'Gemini')
   } catch (error) {
-    console.error('\x1b[31m%s\x1b[0m', '❌ [AI Parser] Gemini failed, falling back to regex extraction:', error)
+    console.error('❌ [Parser] AI Parser failed, falling back to regex extraction:', (error as any).message)
     const fallbackData = extractCvData(text)
     console.log('\x1b[33m%s\x1b[0m', '⚠️ [Parser] Local regex extraction complete.')
     return fallbackData
+  }
+}
+
+function logAndReturn(aiData: any, rawText: string, provider: string) {
+  console.log('\x1b[32m%s\x1b[0m', `✨ [${provider} Parser] Extracted for: ${aiData.name || 'Unnamed'}`)
+  console.log('\x1b[36m%s\x1b[0m', `📍 Location: ${aiData.location || 'None'}`)
+  console.log('\x1b[36m%s\x1b[0m', `🛠️ Skills: ${aiData.skills?.length || 0} detected`)
+
+  return {
+    ...aiData,
+    rawText,
   }
 }
