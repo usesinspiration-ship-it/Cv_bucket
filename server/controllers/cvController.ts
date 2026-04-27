@@ -69,13 +69,18 @@ export async function uploadCv(request: Request, response: Response) {
       request.file.originalname
     )
 
+    if (!parsed.rawText || parsed.rawText.trim().length === 0) {
+      throw new HttpError(400, 'The CV could not be parsed (empty content). Please ensure the file is not corrupted, encrypted, or an image-only PDF.')
+    }
+
     // Check if this phone number already exists
     if (parsed.phone) {
-      const normalizedPhone = parsed.phone.replace(/\D/g, '')
+      const phoneStr = String(parsed.phone)
+      const normalizedPhone = phoneStr.replace(/\D/g, '')
       if (normalizedPhone) {
-        const existingByPhone = await findCvByPhone(parsed.phone)
+        const existingByPhone = await findCvByPhone(phoneStr)
         if (existingByPhone) {
-          throw new HttpError(400, `A CV for this phone number (${parsed.phone}) already exists: "${existingByPhone.fileName}".`)
+          throw new HttpError(400, `A CV for this phone number (${phoneStr}) already exists: "${existingByPhone.fileName}".`)
         }
       }
     }
@@ -89,7 +94,7 @@ export async function uploadCv(request: Request, response: Response) {
       fileSize: request.file.size,
       name: parsed.name,
       email: parsed.email,
-      phone: parsed.phone,
+      phone: parsed.phone ? String(parsed.phone) : '',
       skills: parsed.skills,
       experience: parsed.experience,
       education: parsed.education,

@@ -15,6 +15,9 @@ import { useAuth } from '../hooks/useAuth'
 import { deleteCV, fetchCVs, getApiError, uploadCV } from '../services/api'
 import type { CVRecord, SearchFilters } from '../types/cv'
 import { formatFileSize } from '../utils/format'
+import { Toast } from '../components/Toast'
+import { useToast } from '../hooks/useToast'
+import { playErrorSound, playSuccessSound } from '../utils/audio'
 
 const initialFilters: SearchFilters = {
   query: '',
@@ -47,6 +50,8 @@ export function DashboardPage() {
   const [pendingEdit, setPendingEdit] = useState(false)
   const [cooldownTime, setCooldownTime] = useState(0)
   const [syncing, setSyncing] = useState(false)
+  const [localHistory, setLocalHistory] = useState<{ fileName: string, fileSize: number, timestamp: string }[]>([])
+  const { toast, showToast, hideToast } = useToast()
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadingRef = useRef(false)
 
@@ -106,6 +111,17 @@ export function DashboardPage() {
     }
   }, [deferredName, deferredQuery, deferredSkill, filters.page, filters.pageSize, user?.uid])
 
+  useEffect(() => {
+    const saved = localStorage.getItem('cv_upload_history')
+    if (saved) {
+      try {
+        setLocalHistory(JSON.parse(saved))
+      } catch (e) {
+        console.error('Failed to parse upload history')
+      }
+    }
+  }, [])
+
   async function handleManualSync() {
     if (loading || syncing) return
     setSyncing(true)
@@ -159,6 +175,19 @@ export function DashboardPage() {
         try {
           const created = await uploadCV(file, token, setUploadProgress)
           successCount++
+          playSuccessSound()
+          
+          // Track locally
+          const newRecord = {
+            fileName: file.name,
+            fileSize: file.size,
+            timestamp: new Date().toISOString(),
+          }
+          setLocalHistory((prev) => {
+            const next = [newRecord, ...prev].slice(0, 50) // Keep last 50
+            localStorage.setItem('cv_upload_history', JSON.stringify(next))
+            return next
+          })
           
           // Optionally update local list for immediate feedback
           if (files.length === 1) {
@@ -168,7 +197,10 @@ export function DashboardPage() {
             setSelectedCv(created)
           }
         } catch (uploadError) {
-          console.error(`Failed to upload ${file.name}:`, uploadError)
+          const errorMsg = getApiError(uploadError)
+          console.error(`Failed to upload ${file.name}:`, errorMsg)
+          showToast(`Failed to upload ${file.name}: ${errorMsg}`, 'error')
+          playErrorSound()
           failureCount++
         }
       }
@@ -177,6 +209,7 @@ export function DashboardPage() {
         setError(`Completed with issues: ${successCount} successful, ${failureCount} failed.`)
       } else if (files.length > 1) {
         // Success message for bulk
+        showToast(`Successfully uploaded ${successCount} files.`, 'success')
         setUploadStatus(`Successfully uploaded ${successCount} files.`)
       }
 
@@ -329,6 +362,11 @@ export function DashboardPage() {
               progress={uploadProgress}
               status={uploadStatus}
               onUpload={handleUpload}
+              history={localHistory}
+              onClearHistory={() => {
+                setLocalHistory([])
+                localStorage.removeItem('cv_upload_history')
+              }}
             />
           </section>
         ) : null}
@@ -498,6 +536,12 @@ export function DashboardPage() {
             </div>
           </section>
         ) : null}
+
+        <Toast
+          message={toast?.message ?? null}
+          type={toast?.type ?? 'info'}
+          onClose={hideToast}
+        />
       </div>
     </main>
   )

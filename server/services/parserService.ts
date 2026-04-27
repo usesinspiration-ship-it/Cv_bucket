@@ -56,10 +56,27 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     ${text.slice(0, 30000)}
   `
 
-  // ─── Try Groq First (Fastest & High Quota) ──────────────────────────────────
+  // ─── Tiered AI Strategy ──────────────────────────────────────────────────
+  
+  // Tier 1: Groq Instant (Llama 3.1 8B) - 14.4k limit
   if (groq) {
     try {
-      console.log('🚀 [Parser] Attempting Groq extraction (Llama 3.3)...')
+      console.log('⚡ [Parser] Tier 1: Attempting Groq Instant (Llama 3.1 8B)...')
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.1-8b-instant',
+        response_format: { type: 'json_object' },
+      })
+
+      const aiData = JSON.parse(completion.choices[0]?.message?.content || '{}')
+      return logAndReturn(aiData, text, 'Groq-Instant')
+    } catch (error) {
+      console.warn('⚠️ [Parser] Tier 1 (Instant) failed, moving to Tier 2...', (error as any).message)
+    }
+
+    // Tier 2: Groq Versatile (Llama 3.3 70B) - 1k limit
+    try {
+      console.log('🚀 [Parser] Tier 2: Attempting Groq Versatile (Llama 3.3 70B)...')
       const completion = await groq.chat.completions.create({
         messages: [{ role: 'user', content: prompt }],
         model: 'llama-3.3-70b-versatile',
@@ -67,15 +84,15 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
       })
 
       const aiData = JSON.parse(completion.choices[0]?.message?.content || '{}')
-      return logAndReturn(aiData, text, 'Groq')
+      return logAndReturn(aiData, text, 'Groq-Versatile')
     } catch (error) {
-      console.error('⚠️ [Parser] Groq failed, trying Gemini...', (error as any).message)
+      console.error('⚠️ [Parser] Tier 2 (Versatile) failed, moving to Tier 3...', (error as any).message)
     }
   }
 
-  // ─── Try Gemini (Fallback) ──────────────────────────────────────────────────
+  // Tier 3: Gemini (Fallback)
   try {
-    console.log('♊ [Parser] Attempting Gemini extraction...')
+    console.log('♊ [Parser] Tier 3: Attempting Gemini extraction...')
     const model = genAI.getGenerativeModel({ 
       model: 'gemini-1.5-flash-latest',
       generationConfig: { responseMimeType: 'application/json' }
@@ -88,7 +105,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
 
     return logAndReturn(aiData, text, 'Gemini')
   } catch (error) {
-    console.error('❌ [Parser] AI Parser failed, falling back to regex extraction:', (error as any).message)
+    console.error('❌ [Parser] All AI Tiers failed, falling back to regex extraction:', (error as any).message)
     const fallbackData = extractCvData(text)
     console.log('\x1b[33m%s\x1b[0m', '⚠️ [Parser] Local regex extraction complete.')
     return fallbackData
