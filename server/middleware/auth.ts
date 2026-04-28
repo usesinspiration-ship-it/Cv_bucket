@@ -8,10 +8,6 @@ import { HttpError } from '../utils/httpError.js'
 const profileCache = new Map<string, { profile: any; expires: number }>()
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours (Profile Cache - Manual Reset via refresh=true)
 
-// Pre-compute allowed emails array to save CPU on every request
-const allowedEmailsStr = env.ALLOWED_EMAILS || ''
-const ALLOWED_EMAILS_ARRAY = allowedEmailsStr ? allowedEmailsStr.split(',').map((email) => email.trim().toLowerCase()) : []
-
 // Simple in-memory rate limiting (Burst Guard)
 const requestCounts = new Map<string, { count: number; lastReset: number }>()
 
@@ -57,17 +53,6 @@ export async function requireAuth(request: Request, _response: Response, next: N
 
     const decodedToken = await adminAuth.verifyIdToken(idToken)
 
-    // Enforce Email Whitelist
-    if (ALLOWED_EMAILS_ARRAY.length > 0) {
-      const userEmail = decodedToken.email?.toLowerCase() || ''
-      
-      if (!ALLOWED_EMAILS_ARRAY.includes(userEmail)) {
-        console.warn(`[Blocked Access] Unauthorized login attempt by ${userEmail}`)
-        next(new HttpError(403, 'Your email is not authorized to access this system. Please contact the administrator.'))
-        return
-      }
-    }
-    
     // Check cache first (Bypass if refresh is requested)
     const forceRefresh = request.query.refresh === 'true'
     const cached = profileCache.get(decodedToken.uid)
