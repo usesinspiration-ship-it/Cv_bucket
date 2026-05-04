@@ -74,7 +74,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
       console.warn('⚠️ [Parser] Tier 1 (Instant) failed, moving to Tier 2...', (error as any).message)
     }
 
-    // Tier 2: Groq Versatile (Llama 3.3 70B) - 1k limit
+    // Tier 2: Groq Versatile (Llama 3.3 70B)
     try {
       console.log('🚀 [Parser] Tier 2: Attempting Groq Versatile (Llama 3.3 70B)...')
       const completion = await groq.chat.completions.create({
@@ -86,15 +86,30 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
       const aiData = JSON.parse(completion.choices[0]?.message?.content || '{}')
       return logAndReturn(aiData, text, 'Groq-Versatile')
     } catch (error) {
-      console.error('⚠️ [Parser] Tier 2 (Versatile) failed, moving to Tier 3...', (error as any).message)
+      console.warn('⚠️ [Parser] Tier 2 (Versatile) failed, moving to Tier 3...', (error as any).message)
+    }
+
+    // Tier 3: Groq Mixtral (Extra Quota)
+    try {
+      console.log('🌪️ [Parser] Tier 3: Attempting Groq Mixtral (8x7B)...')
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'mixtral-8x7b-32768',
+        response_format: { type: 'json_object' },
+      })
+
+      const aiData = JSON.parse(completion.choices[0]?.message?.content || '{}')
+      return logAndReturn(aiData, text, 'Groq-Mixtral')
+    } catch (error) {
+      console.warn('⚠️ [Parser] Tier 3 (Mixtral) failed, moving to Tier 4...', (error as any).message)
     }
   }
 
-  // Tier 3: Gemini (Fallback)
+  // Tier 4: Gemini (Fallback)
   try {
-    console.log('♊ [Parser] Tier 3: Attempting Gemini extraction...')
+    console.log('♊ [Parser] Tier 4: Attempting Gemini extraction...')
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash-latest',
+      model: 'gemini-1.5-flash', // Corrected model name
       generationConfig: { responseMimeType: 'application/json' }
     })
 
