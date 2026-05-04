@@ -156,6 +156,19 @@ export function DashboardPage() {
     }
   }, [loadCVs]) // loadCVs no longer depends on cooldownTime directly in a way that loops
 
+  useEffect(() => {
+    // Warn user before leaving during upload
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (uploading) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [uploading])
+
   async function handleUpload(files: File[]) {
     if (!user || files.length === 0) {
       return
