@@ -28,6 +28,11 @@ export function UploadCard({ busy, progress, status, onUpload, history = [], onC
     await onUpload(Array.from(files))
   }
 
+  const todayStr = new Date().toISOString().split('T')[0]
+  const todayCount = history.filter(item => 
+    new Date(item.timestamp).toISOString().split('T')[0] === todayStr
+  ).length
+
   return (
     <div className="space-y-4">
       <div className="glass-panel p-6">
@@ -42,7 +47,7 @@ export function UploadCard({ busy, progress, status, onUpload, history = [], onC
             {history.length > 0 && (
               <span className="tag bg-emerald-50 text-emerald-700 border-emerald-100">
                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                {history.length} Local Uploads
+                Today: {todayCount} • Total: {history.length}
               </span>
             )}
             <span className="tag">
@@ -127,9 +132,24 @@ export function UploadCard({ busy, progress, status, onUpload, history = [], onC
       {history.length > 0 && (
         <div className="glass-panel animate-slide-up p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
-              Recent Local History
-            </h3>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
+                Recent Local History
+              </h3>
+              {history.length > 0 && (
+                <p className="mt-1 text-[10px] font-bold text-slate-400">
+                  {Object.entries(
+                    history.reduce((acc, item) => {
+                      const d = new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                      acc[d] = (acc[d] || 0) + 1
+                      return acc
+                    }, {} as Record<string, number>)
+                  )
+                    .map(([date, count]) => `${date}: ${count}`)
+                    .join(' • ')}
+                </p>
+              )}
+            </div>
             <button
               onClick={onClearHistory}
               className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors"
