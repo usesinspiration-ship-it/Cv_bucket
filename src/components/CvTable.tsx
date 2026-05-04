@@ -105,7 +105,7 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
               <th className="px-6 py-4 min-w-[240px]">Candidate</th>
               <th className="px-6 py-4 min-w-[120px]">Indexed</th>
               <th className="px-6 py-4 min-w-[160px]">File Spec</th>
-              <th className="px-6 py-4 text-right">Actions</th>
+              <th className="sticky right-0 z-10 bg-slate-50/90 px-6 py-4 text-right backdrop-blur-sm shadow-[-12px_0_15px_-3px_rgba(15,23,42,0.02)]">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100/60 bg-white/40 text-sm">
@@ -149,7 +149,7 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-5">
+                <td className="sticky right-0 z-10 bg-white/90 px-6 py-5 backdrop-blur-sm shadow-[-12px_0_15px_-3px_rgba(15,23,42,0.02)] group-hover:bg-white">
                   <div className="flex justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                     <button
                       type="button"

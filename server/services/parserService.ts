@@ -113,12 +113,24 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
 }
 
 function logAndReturn(aiData: any, rawText: string, provider: string) {
-  console.log('\x1b[32m%s\x1b[0m', `✨ [${provider} Parser] Extracted for: ${aiData.name || 'Unnamed'}`)
-  console.log('\x1b[36m%s\x1b[0m', `📍 Location: ${aiData.location || 'None'}`)
-  console.log('\x1b[36m%s\x1b[0m', `🛠️ Skills: ${aiData.skills?.length || 0} detected`)
+  // Normalize AI data to ensure no nulls are passed to the database
+  const normalized = {
+    name: String(aiData.name || '').trim(),
+    email: String(aiData.email || '').trim(),
+    phone: String(aiData.phone || '').trim(),
+    skills: Array.isArray(aiData.skills) ? aiData.skills : [],
+    experience: String(aiData.experience || '').trim(),
+    education: String(aiData.education || '').trim(),
+    location: String(aiData.location || '').trim(),
+    salary: String(aiData.salary || '').trim(),
+  }
+
+  console.log('\x1b[32m%s\x1b[0m', `✨ [${provider} Parser] Extracted for: ${normalized.name || 'Unnamed'}`)
+  console.log('\x1b[36m%s\x1b[0m', `📍 Location: ${normalized.location || 'None'}`)
+  console.log('\x1b[36m%s\x1b[0m', `🛠️ Skills: ${normalized.skills?.length || 0} detected`)
 
   return {
-    ...aiData,
+    ...normalized,
     rawText,
   }
 }

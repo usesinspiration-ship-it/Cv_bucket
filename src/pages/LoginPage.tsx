@@ -43,14 +43,14 @@ export function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 sm:px-6 lg:px-10">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-2 py-12 sm:px-3 lg:px-5">
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-mesh opacity-40" />
         <div className="absolute left-[-10%] top-[-10%] h-[40%] w-[40%] rounded-full bg-brand-500/10 blur-[120px] animate-pulse-subtle" />
         <div className="absolute bottom-[-10%] right-[-10%] h-[40%] w-[40%] rounded-full bg-orange-500/10 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 grid w-full max-w-7xl gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+      <div className="relative z-10 grid w-full max-w-[1600px] gap-8 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="glass-panel group overflow-hidden border-none p-10 shadow-panel transition-all duration-500 hover:shadow-glow lg:p-16">
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-brand-700 shadow-sm ring-1 ring-inset ring-brand-500/20">
             <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" />

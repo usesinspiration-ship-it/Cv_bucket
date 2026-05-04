@@ -280,8 +280,8 @@ export function DashboardPage() {
   )
 
   return (
-    <main className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1400px] space-y-4">
+    <main className="min-h-screen px-2 py-4 sm:px-3 lg:px-4">
+      <div className="mx-auto max-w-[1600px] space-y-4">
         <header className="glass-panel border-none p-5 shadow-panel animate-fade-in">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
