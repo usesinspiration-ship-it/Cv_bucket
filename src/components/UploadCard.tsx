@@ -47,7 +47,7 @@ export function UploadCard({ busy, progress, status, onUpload, history = [], onC
             {history.length > 0 && (
               <span className="tag bg-emerald-50 text-emerald-700 border-emerald-100">
                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                Today: {todayCount} • Total: {history.length}
+                Today (Local): {todayCount} • Total (Local): {history.length}
               </span>
             )}
             <span className="tag">
@@ -138,7 +138,7 @@ export function UploadCard({ busy, progress, status, onUpload, history = [], onC
               </h3>
               {history.length > 0 && (
                 <p className="mt-1 text-[10px] font-bold text-slate-400">
-                  {Object.entries(
+                  Local Summary: {Object.entries(
                     history.reduce((acc, item) => {
                       const d = new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
                       acc[d] = (acc[d] || 0) + 1
