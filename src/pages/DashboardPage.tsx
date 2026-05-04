@@ -18,6 +18,7 @@ import { formatFileSize } from '../utils/format'
 import { Toast } from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import { playErrorSound, playSuccessSound } from '../utils/audio'
+import { useWakeLock } from '../hooks/useWakeLock'
 
 const initialFilters: SearchFilters = {
   query: '',
@@ -54,6 +55,9 @@ export function DashboardPage() {
   const { toast, showToast, hideToast } = useToast()
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadingRef = useRef(false)
+  
+  // Prevent sleep during uploads
+  useWakeLock(uploading)
 
   const loadCVs = useCallback(async (signal?: AbortSignal, refresh = false) => {
     if (!user || loadingRef.current) {
