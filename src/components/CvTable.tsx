@@ -33,9 +33,12 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
                   onClick={() => onSelect(cv)}
                   className="block text-left text-lg font-bold text-slate-900 transition-colors hover:text-brand-600"
                 >
-                  uploaded by : - {highlightText(cv.uploaderEmail || 'Unknown', query)}
+                  {highlightText(cv.name || 'Unnamed candidate', query)}
                 </button>
-                <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
+                <div className="mt-1 flex flex-col gap-0.5 text-xs text-slate-500">
+                  <span className="font-medium text-slate-400">
+                    uploaded by : - {highlightText(cv.uploaderEmail || 'Unknown', query)}
+                  </span>
                   <span className="whitespace-nowrap">{formatDate(cv.createdAt)}</span>
                 </div>
               </div>
@@ -113,14 +116,17 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
                 onDoubleClick={() => onDoubleClick?.(cv)}
               >
                 <td className="px-6 py-5">
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1">
                     <button
                       type="button"
                       onClick={() => onSelect(cv)}
                       className="w-fit text-left text-base font-bold text-slate-900 transition-colors group-hover:text-brand-600"
                     >
-                      uploaded by : - {highlightText(cv.uploaderEmail || 'Unknown', query)}
+                      {highlightText(cv.name || 'Unnamed candidate', query)}
                     </button>
+                    <span className="text-[11px] font-medium text-slate-400">
+                      uploaded by : - {highlightText(cv.uploaderEmail || 'Unknown', query)}
+                    </span>
                   </div>
                 </td>
                 <td className="px-6 py-5">
