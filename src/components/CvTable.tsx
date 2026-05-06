@@ -33,19 +33,14 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
                   onClick={() => onSelect(cv)}
                   className="block text-left text-lg font-bold text-slate-900 transition-colors hover:text-brand-600"
                 >
-                  {highlightText(cv.name || 'Unnamed candidate', query)}
+                  uploaded by : - {highlightText(cv.uploaderEmail || 'Unknown', query)}
                 </button>
                 <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                  <span className="truncate">{cv.email || 'No email found'}</span>
-                  <span className="h-1 w-1 rounded-full bg-slate-300" />
                   <span className="whitespace-nowrap">{formatDate(cv.createdAt)}</span>
                 </div>
               </div>
             </div>
 
-            <p className="mt-4 line-clamp-2 text-sm leading-relaxed text-slate-500">
-              {highlightText(cv.rawText.slice(0, 160) || 'No preview available', query)}
-            </p>
 
             <div className="mt-5 flex items-center justify-between gap-3 pt-4 border-t border-slate-100">
               <div className="flex flex-col">
@@ -124,14 +119,8 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
                       onClick={() => onSelect(cv)}
                       className="w-fit text-left text-base font-bold text-slate-900 transition-colors group-hover:text-brand-600"
                     >
-                      {highlightText(cv.name || 'Unnamed candidate', query)}
+                      uploaded by : - {highlightText(cv.uploaderEmail || 'Unknown', query)}
                     </button>
-                    <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-                      <span>{cv.email || 'No email found'}</span>
-                    </div>
-                    <span className="line-clamp-1 max-w-md text-xs leading-relaxed text-slate-500">
-                      {highlightText(cv.rawText.slice(0, 120) || 'No preview available', query)}
-                    </span>
                   </div>
                 </td>
                 <td className="px-6 py-5">

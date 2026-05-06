@@ -15,6 +15,7 @@ export interface CVRecord {
   rawText: string
   salary?: string
   location?: string
+  uploaderEmail?: string
   createdAt: string
 }
 

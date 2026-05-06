@@ -102,6 +102,7 @@ export async function uploadCv(request: Request, response: Response) {
       salary: parsed.salary || 'Not mentioned',
       rawText: parsed.rawText,
       fileHash,
+      uploaderEmail: authUser.email,
     })
 
     if (!created) {

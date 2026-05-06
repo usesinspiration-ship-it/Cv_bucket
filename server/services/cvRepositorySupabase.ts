@@ -18,6 +18,7 @@ export interface CvRecord {
   fileHash: string
   salary?: string
   location?: string
+  uploaderEmail?: string
   createdAt: string
 }
 
@@ -147,7 +148,7 @@ export async function listCvsPaginated(
     // 1. Build Search Query
     let queryBuilder = supabase
       .from('cvs')
-      .select('id, userId, fileUrl, objectKey, fileName, fileSize, name, email, phone, skills, experience, education, fileHash, salary, location, createdAt, rawText', { count: 'exact' })
+      .select('id, userId, uploaderEmail, fileUrl, objectKey, fileName, fileSize, name, email, phone, skills, experience, education, fileHash, salary, location, createdAt, rawText', { count: 'exact' })
 
     if (filters.query) {
       // Use PostgreSQL Full-Text Search on the generated search_vector column
