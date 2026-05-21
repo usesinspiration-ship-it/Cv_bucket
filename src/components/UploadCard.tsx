@@ -263,6 +263,15 @@ export function UploadCard({
                   let bgClass = 'bg-white border-slate-100 hover:border-slate-200'
 
                   switch (item.status) {
+                    case 'prescreening':
+                      statusBadge = (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black text-amber-700 ring-1 ring-inset ring-amber-600/10 shadow-sm animate-pulse-subtle">
+                          <LoaderCircle className="h-3 w-3 animate-spin" />
+                          PRE-SCREENING
+                        </span>
+                      )
+                      bgClass = 'bg-amber-50/10 border-amber-200/50 shadow-sm ring-1 ring-amber-500/5'
+                      break
                     case 'hashing':
                       statusBadge = (
                         <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700 ring-1 ring-inset ring-violet-600/10 shadow-sm animate-pulse-subtle">

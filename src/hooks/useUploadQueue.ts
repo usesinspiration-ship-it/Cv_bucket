@@ -8,7 +8,8 @@ import type { CVRecord } from '../types/cv'
 export interface QueueItem {
   id: string
   file: File
-  status: 'pending' | 'hashing' | 'checking' | 'uploading' | 'success' | 'failed' | 'skipped'
+  hash?: string
+  status: 'prescreening' | 'pending' | 'hashing' | 'checking' | 'uploading' | 'success' | 'failed' | 'skipped'
   progress: number
   retries: number
   error?: string
@@ -25,12 +26,14 @@ export interface QueueStats {
 
 const CONCURRENCY_LIMIT = 3
 const MAX_RETRIES = 3
+const HASH_BATCH_SIZE = 50
 
 export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
   const { user } = useAuth()
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [isPaused, setIsPaused] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isPreScreening, setIsPreScreening] = useState(false)
 
   // Ref locks to avoid stale state in asynchronous recursion loop
   const queueRef = useRef<QueueItem[]>([])
@@ -52,10 +55,10 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
   // Sync isUploading state based on active processes
   useEffect(() => {
     const active = queue.some(
-      (item) => ['hashing', 'checking', 'uploading'].includes(item.status)
+      (item) => ['prescreening', 'hashing', 'checking', 'uploading'].includes(item.status)
     )
-    setIsUploading(active || activeCountRef.current > 0)
-  }, [queue])
+    setIsUploading(active || activeCountRef.current > 0 || isPreScreening)
+  }, [queue, isPreScreening])
 
   // Clear timers and controllers on unmount
   useEffect(() => {
@@ -85,55 +88,16 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
 
     const { id, file, retries } = pendingItem
     activeCountRef.current += 1
-    
-    // Step 1: Client Hashing
-    updateItem(id, { status: 'hashing', error: undefined })
 
     try {
-      // Abort-sensitive hash generation
-      const hash = await computeFileHash(file)
-
       if (isPausedRef.current) {
         activeCountRef.current -= 1
         updateItem(id, { status: 'pending' })
         return
       }
 
-      // Step 2: Check Duplicate
-      updateItem(id, { status: 'checking' })
-      let token = await user.getIdToken()
-      let duplicates: string[] = []
-
-      try {
-        duplicates = await checkDuplicates([hash], token)
-      } catch (checkErr) {
-        const checkErrMsg = getApiError(checkErr)
-        if (
-          checkErrMsg.includes('expired') ||
-          checkErrMsg.includes('token') ||
-          checkErrMsg.includes('401') ||
-          checkErrMsg.includes('auth/')
-        ) {
-          console.warn('🔄 ID token expired during check. Refreshing...')
-          token = await user.getIdToken(true)
-          duplicates = await checkDuplicates([hash], token)
-        } else {
-          throw checkErr
-        }
-      }
-
-      if (duplicates.includes(hash)) {
-        // Skipped duplicate
-        updateItem(id, { status: 'skipped', progress: 100 })
-        activeCountRef.current -= 1
-        playSuccessSound()
-        // Process next available item in parallel
-        processNextRef.current()
-        return
-      }
-
-      // Step 3: Network Upload
-      updateItem(id, { status: 'uploading', progress: 0 })
+      // Duplicates are already pre-screened in addFiles, go straight to upload
+      updateItem(id, { status: 'uploading', progress: 0, error: undefined })
       
       const controller = new AbortController()
       abortControllersRef.current[id] = controller
@@ -255,18 +219,94 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
   }, [queue, isPaused, user])
 
   // Public control APIs
-  const addFiles = useCallback((files: File[]) => {
-    const newItems = files.map((file) => ({
+  const addFiles = useCallback(async (files: File[]) => {
+    if (!user || files.length === 0) return
+
+    // 1. Immediately show all files as 'prescreening' so the UI reacts instantly
+    const newItems: QueueItem[] = files.map((file) => ({
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       file,
-      status: 'pending' as const,
+      status: 'prescreening' as const,
       progress: 0,
       retries: 0,
     }))
 
     setQueue((prev) => [...prev, ...newItems])
     setIsPaused(false)
-  }, [])
+    setIsPreScreening(true)
+
+    try {
+      // 2. Hash ALL files in parallel (in batches to avoid memory pressure)
+      const hashMap = new Map<string, string>() // itemId -> hash
+      for (let i = 0; i < newItems.length; i += HASH_BATCH_SIZE) {
+        const batch = newItems.slice(i, i + HASH_BATCH_SIZE)
+        const results = await Promise.all(
+          batch.map(async (item) => {
+            const hash = await computeFileHash(item.file)
+            return { id: item.id, hash }
+          })
+        )
+        for (const r of results) {
+          hashMap.set(r.id, r.hash)
+        }
+      }
+
+      // 3. Send ONE bulk API call with all hashes
+      const allHashes = Array.from(hashMap.values())
+      let token = await user.getIdToken()
+      let duplicateHashes: string[] = []
+
+      try {
+        duplicateHashes = await checkDuplicates(allHashes, token)
+      } catch (checkErr) {
+        const checkErrMsg = getApiError(checkErr)
+        if (
+          checkErrMsg.includes('expired') ||
+          checkErrMsg.includes('token') ||
+          checkErrMsg.includes('401') ||
+          checkErrMsg.includes('auth/')
+        ) {
+          token = await user.getIdToken(true)
+          duplicateHashes = await checkDuplicates(allHashes, token)
+        } else {
+          throw checkErr
+        }
+      }
+
+      const duplicateSet = new Set(duplicateHashes)
+
+      // 4. Instantly mark duplicates as 'skipped', rest as 'pending'
+      setQueue((prev) =>
+        prev.map((item) => {
+          const hash = hashMap.get(item.id)
+          if (!hash || item.status !== 'prescreening') return item
+
+          if (duplicateSet.has(hash)) {
+            return { ...item, hash, status: 'skipped' as const, progress: 100 }
+          }
+          return { ...item, hash, status: 'pending' as const }
+        })
+      )
+
+      const skippedCount = newItems.filter((item) => duplicateSet.has(hashMap.get(item.id) ?? '')).length
+      if (skippedCount > 0) {
+        playSuccessSound()
+      }
+
+    } catch (err) {
+      console.error('Pre-screening failed, falling back to per-file checks:', err)
+      // Fallback: mark all as pending so the per-file pipeline handles them
+      setQueue((prev) =>
+        prev.map((item) =>
+          item.status === 'prescreening'
+            ? { ...item, status: 'pending' as const }
+            : item
+        )
+      )
+    } finally {
+      setIsPreScreening(false)
+    }
+  }, [user])
 
   const pause = useCallback(() => {
     setIsPaused(true)
@@ -310,7 +350,7 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
     failed: queue.filter((item) => item.status === 'failed').length,
     skipped: queue.filter((item) => item.status === 'skipped').length,
     processing: queue.filter((item) =>
-      ['hashing', 'checking', 'uploading'].includes(item.status)
+      ['prescreening', 'hashing', 'checking', 'uploading'].includes(item.status)
     ).length,
     pending: queue.filter((item) => item.status === 'pending').length,
   }
@@ -319,6 +359,7 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
     queue,
     isPaused,
     isUploading,
+    isPreScreening,
     stats,
     addFiles,
     pause,
