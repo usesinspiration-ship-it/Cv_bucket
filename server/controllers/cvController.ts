@@ -21,6 +21,7 @@ import {
   uploadPdfToR2,
 } from '../services/r2Service.js'
 import { HttpError } from '../utils/httpError.js'
+import { computeRelevancy } from '../utils/ftsQueryBuilder.js'
 
 const listQuerySchema = z.object({
   query: z.string().optional().default(''),
@@ -165,7 +166,7 @@ export async function listCvs(request: Request, response: Response) {
   }
 
   response.json({
-    items: await Promise.all(viewable.map((cv) => serializeCv(cv))),
+    items: await Promise.all(viewable.map((cv) => serializeCv(cv, filters.query))),
     total: filteredCount,
     page: filters.page,
     pageSize: filters.pageSize,
@@ -220,11 +221,12 @@ export async function deleteCv(request: Request, response: Response) {
   response.status(204).send()
 }
 
-async function serializeCv(cv: CvRecord) {
+async function serializeCv(cv: CvRecord, query?: string) {
   return {
     ...cv,
     createdAt: toIsoString(cv.createdAt),
     downloadUrl: await createDownloadUrl(cv.objectKey, cv.fileName),
+    relevancy: query ? computeRelevancy(cv, query) : undefined,
   }
 }
 

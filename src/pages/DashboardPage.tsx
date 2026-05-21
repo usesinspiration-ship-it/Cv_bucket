@@ -12,13 +12,12 @@ import {
   type WorkspaceTabItem,
 } from '../components/WorkspaceTabs'
 import { useAuth } from '../hooks/useAuth'
-import { checkDuplicates, deleteCV, fetchCVs, getApiError, uploadCV } from '../services/api'
-import { computeFileHash } from '../utils/hash'
+import { useUploadQueue } from '../hooks/useUploadQueue'
+import { deleteCV, fetchCVs, getApiError } from '../services/api'
 import type { CVRecord, SearchFilters } from '../types/cv'
 import { formatFileSize } from '../utils/format'
 import { Toast } from '../components/Toast'
 import { useToast } from '../hooks/useToast'
-import { playErrorSound, playSuccessSound } from '../utils/audio'
 import { useWakeLock } from '../hooks/useWakeLock'
 
 const initialFilters: SearchFilters = {
@@ -41,9 +40,6 @@ export function DashboardPage() {
   const deferredName = useDeferredValue(filters.name)
   const deferredSkill = useDeferredValue(filters.skill)
   const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadStatus, setUploadStatus] = useState('')
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<DashboardTab>('library')
   const [totalStorageBytes, setTotalStorageBytes] = useState(0)
@@ -53,12 +49,9 @@ export function DashboardPage() {
   const [cooldownTime, setCooldownTime] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const [localHistory, setLocalHistory] = useState<{ fileName: string, fileSize: number, timestamp: string }[]>([])
-  const { toast, showToast, hideToast } = useToast()
+  const { toast, hideToast } = useToast()
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadingRef = useRef(false)
-  
-  // Prevent sleep during uploads
-  useWakeLock(uploading)
 
   const loadCVs = useCallback(async (signal?: AbortSignal, refresh = false) => {
     if (!user || loadingRef.current) {
@@ -116,6 +109,42 @@ export function DashboardPage() {
     }
   }, [deferredName, deferredQuery, deferredSkill, filters.page, filters.pageSize, user?.uid])
 
+  // Initialize the bulk upload queue hook
+  const uploadQueue = useUploadQueue(
+    useCallback((cv: CVRecord) => {
+      // 1. Add to local upload history registry
+      const newRecord = {
+        fileName: cv.fileName,
+        fileSize: cv.fileSize,
+        timestamp: new Date().toISOString(),
+      }
+      setLocalHistory((prev) => {
+        const next = [newRecord, ...prev].slice(0, 50)
+        localStorage.setItem('cv_upload_history', JSON.stringify(next))
+        return next
+      })
+
+      // 2. Optimistic UI update for immediate list feedback
+      setItems((current) => [cv, ...current].slice(0, filters.pageSize))
+      setTotal((current) => current + 1)
+      setTotalStorageBytes((current) => current + cv.fileSize)
+      setSelectedCv(cv)
+    }, [filters.pageSize])
+  )
+
+  // Trigger a full index refresh when the upload queue finishes all items
+  const prevIsUploadingRef = useRef(false)
+  useEffect(() => {
+    if (prevIsUploadingRef.current && !uploadQueue.isUploading) {
+      // Session processing completed or cancelled
+      void loadCVs(undefined, true)
+    }
+    prevIsUploadingRef.current = uploadQueue.isUploading
+  }, [uploadQueue.isUploading, loadCVs])
+  
+  // Prevent sleep during uploads
+  useWakeLock(uploadQueue.isUploading)
+
   useEffect(() => {
     const saved = localStorage.getItem('cv_upload_history')
     if (saved) {
@@ -160,7 +189,7 @@ export function DashboardPage() {
   useEffect(() => {
     // Warn user before leaving during upload
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (uploading) {
+      if (uploadQueue.isUploading) {
         e.preventDefault()
         e.returnValue = ''
       }
@@ -168,157 +197,7 @@ export function DashboardPage() {
 
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [uploading])
-
-  async function handleUpload(files: File[]) {
-    if (!user || files.length === 0) {
-      return
-    }
-
-    setUploading(true)
-    setError('')
-    
-    let successCount = 0
-    let failureCount = 0
-
-    try {
-      setUploadStatus('Calculating file hashes...')
-      const filesWithHashes = await Promise.all(
-        files.map(async (file) => {
-          const hash = await computeFileHash(file)
-          return { file, hash }
-        })
-      )
-
-      setUploadStatus('Checking for duplicates...')
-      const hashes = filesWithHashes.map((f) => f.hash)
-      let token = await user.getIdToken()
-      let duplicates: string[] = []
-      try {
-        duplicates = await checkDuplicates(hashes, token)
-      } catch (checkError) {
-        const checkErrorMsg = getApiError(checkError)
-        if (
-          checkErrorMsg.includes('expired') ||
-          checkErrorMsg.includes('token') ||
-          checkErrorMsg.includes('401') ||
-          checkErrorMsg.includes('auth/')
-        ) {
-          console.warn('🔄 Token expired during duplicate check. Force refreshing token...')
-          token = await user.getIdToken(true)
-          duplicates = await checkDuplicates(hashes, token)
-        } else {
-          throw checkError
-        }
-      }
-
-      const duplicateHashSet = new Set(duplicates)
-      const filesToUpload = filesWithHashes.filter((f) => !duplicateHashSet.has(f.hash))
-      const duplicateCount = files.length - filesToUpload.length
-
-      if (filesToUpload.length === 0) {
-        const msg = files.length === 1
-          ? `"${files[0].name}" has already been uploaded.`
-          : `All ${files.length} files have already been uploaded.`
-        
-        showToast(msg, 'error')
-        playErrorSound()
-        
-        setUploadStatus(msg)
-        return
-      }
-
-      if (duplicateCount > 0) {
-        showToast(`Skipped ${duplicateCount} already-uploaded duplicate file${duplicateCount === 1 ? '' : 's'}.`, 'info')
-      }
-
-      for (let i = 0; i < filesToUpload.length; i++) {
-        const { file } = filesToUpload[i]
-        const displayIndex = i + 1
-        setUploadStatus(`Uploading ${file.name} (${displayIndex}/${filesToUpload.length})`)
-        setUploadProgress(0)
-
-        try {
-          let freshToken = await user.getIdToken()
-          let created
-          try {
-            created = await uploadCV(file, freshToken, setUploadProgress)
-          } catch (uploadError) {
-            const uploadErrorMsg = getApiError(uploadError)
-            if (
-              uploadErrorMsg.includes('expired') ||
-              uploadErrorMsg.includes('token') ||
-              uploadErrorMsg.includes('401') ||
-              uploadErrorMsg.includes('auth/')
-            ) {
-              console.warn(`🔄 Token expired during upload of ${file.name}. Force refreshing token and retrying...`)
-              freshToken = await user.getIdToken(true)
-              created = await uploadCV(file, freshToken, setUploadProgress)
-            } else {
-              throw uploadError
-            }
-          }
-
-          successCount++
-          playSuccessSound()
-          
-          // Track locally
-          const newRecord = {
-            fileName: file.name,
-            fileSize: file.size,
-            timestamp: new Date().toISOString(),
-          }
-          setLocalHistory((prev) => {
-            const next = [newRecord, ...prev].slice(0, 50) // Keep last 50
-            localStorage.setItem('cv_upload_history', JSON.stringify(next))
-            return next
-          })
-          
-          // Optionally update local list for immediate feedback
-          if (filesToUpload.length === 1) {
-            setItems((current) => [created, ...current].slice(0, filters.pageSize))
-            setTotal((current) => current + 1)
-            setTotalStorageBytes((current) => current + created.fileSize)
-            setSelectedCv(created)
-          }
-        } catch (uploadError) {
-          const errorMsg = getApiError(uploadError)
-          console.error(`Failed to upload ${file.name}:`, errorMsg)
-          showToast(`Failed to upload ${file.name}: ${errorMsg}`, 'error')
-          playErrorSound()
-          failureCount++
-        }
-      }
-
-      if (failureCount > 0) {
-        setError(`Completed with issues: ${successCount} successful, ${failureCount} failed.${duplicateCount > 0 ? ` Skipped ${duplicateCount} duplicate${duplicateCount === 1 ? '' : 's'}.` : ''}`)
-      } else if (files.length > 1) {
-        // Success message for bulk or mixed uploads
-        const msg = duplicateCount > 0
-          ? `Uploaded ${successCount} file${successCount === 1 ? '' : 's'}. Skipped ${duplicateCount} duplicate${duplicateCount === 1 ? '' : 's'}.`
-          : `Successfully uploaded ${successCount} files.`
-        showToast(msg, 'success')
-        setUploadStatus(msg)
-      }
-
-      if (successCount > 0 && filesToUpload.length > 1) {
-        setActiveTab('library')
-      } else if (successCount > 0) {
-        setActiveTab('review')
-      }
-
-    } catch (generalError) {
-      const errorMsg = getApiError(generalError)
-      setError(errorMsg)
-      showToast(errorMsg, 'error')
-      playErrorSound()
-    } finally {
-      setUploading(false)
-      setUploadStatus('')
-      window.setTimeout(() => setUploadProgress(0), 400)
-      await loadCVs()
-    }
-  }
+  }, [uploadQueue.isUploading])
 
   async function handleDelete(cv: CVRecord) {
     if (!user || !window.confirm(`Delete ${cv.fileName}?`)) {
@@ -449,10 +328,15 @@ export function DashboardPage() {
         {activeTab === 'upload' ? (
           <section className="mx-auto max-w-4xl">
             <UploadCard
-              busy={uploading}
-              progress={uploadProgress}
-              status={uploadStatus}
-              onUpload={handleUpload}
+              queue={uploadQueue.queue}
+              isPaused={uploadQueue.isPaused}
+              isUploading={uploadQueue.isUploading}
+              stats={uploadQueue.stats}
+              addFiles={uploadQueue.addFiles}
+              pause={uploadQueue.pause}
+              resume={uploadQueue.resume}
+              cancel={uploadQueue.cancel}
+              retryFailed={uploadQueue.retryFailed}
               history={localHistory}
               onClearHistory={() => {
                 setLocalHistory([])

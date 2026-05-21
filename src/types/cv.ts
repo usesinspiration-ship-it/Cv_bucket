@@ -17,6 +17,7 @@ export interface CVRecord {
   location?: string
   uploaderEmail?: string
   createdAt: string
+  relevancy?: number
 }
 
 export interface SearchFilters {

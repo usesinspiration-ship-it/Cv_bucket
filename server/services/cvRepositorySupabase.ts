@@ -1,5 +1,7 @@
 import { supabase } from '../config/supabase.js'
 import { calculateR2BucketUsage } from './r2Service.js'
+import { buildFtsQuery } from '../utils/ftsQueryBuilder.js'
+
 
 export interface CvRecord {
   id: string
@@ -167,12 +169,13 @@ export async function listCvsPaginated(
       .select('id, userId, uploaderEmail, fileUrl, objectKey, fileName, fileSize, name, email, phone, skills, experience, education, fileHash, salary, location, createdAt, rawText', { count: 'exact' })
 
     if (filters.query) {
-      // Use PostgreSQL Full-Text Search on the generated search_vector column
-      // 'plainto_tsquery' handles multi-word queries gracefully
-      queryBuilder = queryBuilder.textSearch('search_vector', filters.query, {
-        type: 'plain',
-        config: 'english'
-      })
+      const ftsQuery = buildFtsQuery(filters.query)
+      if (ftsQuery) {
+        queryBuilder = queryBuilder.textSearch('search_vector', ftsQuery, {
+          type: 'raw' as unknown as 'plain',
+          config: 'english'
+        })
+      }
     }
 
     if (filters.name) {

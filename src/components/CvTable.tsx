@@ -36,6 +36,11 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
                   {highlightText(cv.name || 'Unnamed candidate', query)}
                 </button>
                 <div className="mt-1 flex flex-col gap-0.5 text-xs text-slate-500">
+                  {cv.relevancy && (
+                    <div className="mb-1.5 w-fit inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 ring-1 ring-inset ring-emerald-600/10">
+                      {cv.relevancy}% Relevancy
+                    </div>
+                  )}
                   <span className="font-medium text-slate-400">
                     uploaded by : - {highlightText(cv.uploaderEmail || 'Unknown', query)}
                   </span>
@@ -101,6 +106,7 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
           <thead className="bg-slate-50/80 text-left text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
             <tr>
               <th className="px-6 py-4 min-w-[240px]">Candidate</th>
+              {query && <th className="px-6 py-4 min-w-[150px]">Relevancy</th>}
               <th className="px-6 py-4 min-w-[120px]">Indexed</th>
               <th className="px-6 py-4 min-w-[160px]">File Spec</th>
               <th className="sticky right-0 z-10 bg-slate-50/90 px-6 py-4 text-right backdrop-blur-sm shadow-[-12px_0_15px_-3px_rgba(15,23,42,0.02)]">Actions</th>
@@ -129,6 +135,17 @@ export function CvTable({ items, selectedId, query, onSelect, onDelete, onEdit, 
                     </span>
                   </div>
                 </td>
+                {query && (
+                  <td className="px-6 py-5">
+                    {cv.relevancy ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-inset ring-emerald-600/10 shadow-sm">
+                        {cv.relevancy}% Match
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400 font-medium">N/A</span>
+                    )}
+                  </td>
+                )}
                 <td className="px-6 py-5">
                   <span className="text-xs font-bold text-slate-500">
                     {formatDate(cv.createdAt)}

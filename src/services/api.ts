@@ -42,12 +42,14 @@ export async function uploadCV(
   file: File,
   token: string,
   onProgress?: (progress: number) => void,
+  signal?: AbortSignal,
 ): Promise<CVRecord> {
   const formData = new FormData()
   formData.append('file', file)
 
   const response = await api.post<CVRecord>('/cvs/upload', formData, {
     headers: authHeaders(token),
+    signal,
     onUploadProgress: (event) => {
       if (!event.total || !onProgress) {
         return
