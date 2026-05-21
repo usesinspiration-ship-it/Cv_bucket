@@ -198,15 +198,7 @@ export function DashboardPage() {
         duplicates = await checkDuplicates(hashes, token)
       } catch (checkError) {
         const checkErrorMsg = getApiError(checkError)
-        const is404 = (checkError as any).response?.status === 404 || 
-                      checkErrorMsg.includes('404') || 
-                      checkErrorMsg.includes('not found') || 
-                      checkErrorMsg.includes('Not Found')
-
-        if (is404) {
-          console.warn('⚠️ /check-duplicates endpoint not found on the backend (not yet deployed). Falling back to normal upload flow.')
-          duplicates = []
-        } else if (
+        if (
           checkErrorMsg.includes('expired') ||
           checkErrorMsg.includes('token') ||
           checkErrorMsg.includes('401') ||
@@ -214,21 +206,7 @@ export function DashboardPage() {
         ) {
           console.warn('🔄 Token expired during duplicate check. Force refreshing token...')
           token = await user.getIdToken(true)
-          try {
-            duplicates = await checkDuplicates(hashes, token)
-          } catch (retryError) {
-            const retryErrorMsg = getApiError(retryError)
-            const isRetry404 = (retryError as any).response?.status === 404 || 
-                               retryErrorMsg.includes('404') || 
-                               retryErrorMsg.includes('not found') || 
-                               retryErrorMsg.includes('Not Found')
-            if (isRetry404) {
-              console.warn('⚠️ /check-duplicates endpoint not found on the backend during retry. Falling back to normal upload flow.')
-              duplicates = []
-            } else {
-              throw retryError
-            }
-          }
+          duplicates = await checkDuplicates(hashes, token)
         } else {
           throw checkError
         }
