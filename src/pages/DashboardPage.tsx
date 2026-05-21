@@ -121,7 +121,7 @@ export function DashboardPage() {
     if (saved) {
       try {
         setLocalHistory(JSON.parse(saved))
-      } catch (e) {
+      } catch {
         console.error('Failed to parse upload history')
       }
     }
@@ -191,22 +191,67 @@ export function DashboardPage() {
       )
 
       setUploadStatus('Checking for duplicates...')
-      const token = await user.getIdToken()
       const hashes = filesWithHashes.map((f) => f.hash)
-      const duplicates = await checkDuplicates(hashes, token)
-      const duplicateHashSet = new Set(duplicates)
+      let token = await user.getIdToken()
+      let duplicates: string[] = []
+      try {
+        duplicates = await checkDuplicates(hashes, token)
+      } catch (checkError) {
+        const checkErrorMsg = getApiError(checkError)
+        const is404 = (checkError as any).response?.status === 404 || 
+                      checkErrorMsg.includes('404') || 
+                      checkErrorMsg.includes('not found') || 
+                      checkErrorMsg.includes('Not Found')
 
+        if (is404) {
+          console.warn('⚠️ /check-duplicates endpoint not found on the backend (not yet deployed). Falling back to normal upload flow.')
+          duplicates = []
+        } else if (
+          checkErrorMsg.includes('expired') ||
+          checkErrorMsg.includes('token') ||
+          checkErrorMsg.includes('401') ||
+          checkErrorMsg.includes('auth/')
+        ) {
+          console.warn('🔄 Token expired during duplicate check. Force refreshing token...')
+          token = await user.getIdToken(true)
+          try {
+            duplicates = await checkDuplicates(hashes, token)
+          } catch (retryError) {
+            const retryErrorMsg = getApiError(retryError)
+            const isRetry404 = (retryError as any).response?.status === 404 || 
+                               retryErrorMsg.includes('404') || 
+                               retryErrorMsg.includes('not found') || 
+                               retryErrorMsg.includes('Not Found')
+            if (isRetry404) {
+              console.warn('⚠️ /check-duplicates endpoint not found on the backend during retry. Falling back to normal upload flow.')
+              duplicates = []
+            } else {
+              throw retryError
+            }
+          }
+        } else {
+          throw checkError
+        }
+      }
+
+      const duplicateHashSet = new Set(duplicates)
       const filesToUpload = filesWithHashes.filter((f) => !duplicateHashSet.has(f.hash))
       const duplicateCount = files.length - filesToUpload.length
 
-      if (duplicateCount > 0) {
-        showToast(`Skipped ${duplicateCount} already-uploaded duplicate files.`, 'info')
+      if (filesToUpload.length === 0) {
+        const msg = files.length === 1
+          ? `"${files[0].name}" has already been uploaded.`
+          : `All ${files.length} files have already been uploaded.`
+        
+        showToast(msg, 'error')
+        playErrorSound()
+        
+        setUploadStatus(msg)
+        return
       }
 
-      if (filesToUpload.length === 0) {
-        setUploadStatus(`All ${files.length} files have already been uploaded.`)
-        playSuccessSound()
-        return
+      if (duplicateCount > 0) {
+        showToast(`Skipped ${duplicateCount} already-uploaded duplicate file${duplicateCount === 1 ? '' : 's'}.`, 'info')
       }
 
       for (let i = 0; i < filesToUpload.length; i++) {
@@ -216,8 +261,26 @@ export function DashboardPage() {
         setUploadProgress(0)
 
         try {
-          const freshToken = await user.getIdToken()
-          const created = await uploadCV(file, freshToken, setUploadProgress)
+          let freshToken = await user.getIdToken()
+          let created
+          try {
+            created = await uploadCV(file, freshToken, setUploadProgress)
+          } catch (uploadError) {
+            const uploadErrorMsg = getApiError(uploadError)
+            if (
+              uploadErrorMsg.includes('expired') ||
+              uploadErrorMsg.includes('token') ||
+              uploadErrorMsg.includes('401') ||
+              uploadErrorMsg.includes('auth/')
+            ) {
+              console.warn(`🔄 Token expired during upload of ${file.name}. Force refreshing token and retrying...`)
+              freshToken = await user.getIdToken(true)
+              created = await uploadCV(file, freshToken, setUploadProgress)
+            } else {
+              throw uploadError
+            }
+          }
+
           successCount++
           playSuccessSound()
           
@@ -250,11 +313,14 @@ export function DashboardPage() {
       }
 
       if (failureCount > 0) {
-        setError(`Completed with issues: ${successCount} successful, ${failureCount} failed.`)
-      } else if (filesToUpload.length > 1) {
-        // Success message for bulk
-        showToast(`Successfully uploaded ${successCount} files.`, 'success')
-        setUploadStatus(`Successfully uploaded ${successCount} files.`)
+        setError(`Completed with issues: ${successCount} successful, ${failureCount} failed.${duplicateCount > 0 ? ` Skipped ${duplicateCount} duplicate${duplicateCount === 1 ? '' : 's'}.` : ''}`)
+      } else if (files.length > 1) {
+        // Success message for bulk or mixed uploads
+        const msg = duplicateCount > 0
+          ? `Uploaded ${successCount} file${successCount === 1 ? '' : 's'}. Skipped ${duplicateCount} duplicate${duplicateCount === 1 ? '' : 's'}.`
+          : `Successfully uploaded ${successCount} files.`
+        showToast(msg, 'success')
+        setUploadStatus(msg)
       }
 
       if (successCount > 0 && filesToUpload.length > 1) {
@@ -264,7 +330,10 @@ export function DashboardPage() {
       }
 
     } catch (generalError) {
-      setError(getApiError(generalError))
+      const errorMsg = getApiError(generalError)
+      setError(errorMsg)
+      showToast(errorMsg, 'error')
+      playErrorSound()
     } finally {
       setUploading(false)
       setUploadStatus('')

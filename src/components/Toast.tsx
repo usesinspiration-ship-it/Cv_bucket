@@ -14,13 +14,23 @@ export function Toast({ message, type, onClose, duration = 5000 }: ToastProps) {
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
-    if (message) {
+    if (!message) return
+
+    let closeTimer: ReturnType<typeof setTimeout>
+
+    const frameId = requestAnimationFrame(() => {
       setIsVisible(true)
-      const timer = setTimeout(() => {
-        setIsVisible(false)
-        setTimeout(onClose, 300) // Wait for exit animation
-      }, duration)
-      return () => clearTimeout(timer)
+    })
+
+    const timer = setTimeout(() => {
+      setIsVisible(false)
+      closeTimer = setTimeout(onClose, 300) // Wait for exit animation
+    }, duration)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      clearTimeout(timer)
+      if (closeTimer) clearTimeout(closeTimer)
     }
   }, [message, duration, onClose])
 
