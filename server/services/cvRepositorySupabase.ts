@@ -105,6 +105,22 @@ export async function findCvByHash(hash: string): Promise<CvRecord | null> {
   }
 }
 
+export async function findCvsByHashes(hashes: string[]): Promise<string[]> {
+  try {
+    if (!hashes || hashes.length === 0) return []
+    const { data, error } = await supabase
+      .from('cvs')
+      .select('fileHash')
+      .in('fileHash', hashes)
+
+    if (error) throw error
+    return (data || []).map((row: any) => row.fileHash)
+  } catch (error) {
+    console.error('Error finding CVs by hashes from Supabase:', error)
+    return []
+  }
+}
+
 export async function findCvByPhone(phone: string): Promise<CvRecord | null> {
   try {
     const { data, error } = await supabase

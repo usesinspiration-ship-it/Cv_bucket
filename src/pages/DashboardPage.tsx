@@ -12,7 +12,8 @@ import {
   type WorkspaceTabItem,
 } from '../components/WorkspaceTabs'
 import { useAuth } from '../hooks/useAuth'
-import { deleteCV, fetchCVs, getApiError, uploadCV } from '../services/api'
+import { checkDuplicates, deleteCV, fetchCVs, getApiError, uploadCV } from '../services/api'
+import { computeFileHash } from '../utils/hash'
 import type { CVRecord, SearchFilters } from '../types/cv'
 import { formatFileSize } from '../utils/format'
 import { Toast } from '../components/Toast'
@@ -181,16 +182,42 @@ export function DashboardPage() {
     let failureCount = 0
 
     try {
+      setUploadStatus('Calculating file hashes...')
+      const filesWithHashes = await Promise.all(
+        files.map(async (file) => {
+          const hash = await computeFileHash(file)
+          return { file, hash }
+        })
+      )
+
+      setUploadStatus('Checking for duplicates...')
       const token = await user.getIdToken()
-      
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
+      const hashes = filesWithHashes.map((f) => f.hash)
+      const duplicates = await checkDuplicates(hashes, token)
+      const duplicateHashSet = new Set(duplicates)
+
+      const filesToUpload = filesWithHashes.filter((f) => !duplicateHashSet.has(f.hash))
+      const duplicateCount = files.length - filesToUpload.length
+
+      if (duplicateCount > 0) {
+        showToast(`Skipped ${duplicateCount} already-uploaded duplicate files.`, 'info')
+      }
+
+      if (filesToUpload.length === 0) {
+        setUploadStatus(`All ${files.length} files have already been uploaded.`)
+        playSuccessSound()
+        return
+      }
+
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const { file } = filesToUpload[i]
         const displayIndex = i + 1
-        setUploadStatus(`Uploading ${file.name} (${displayIndex}/${files.length})`)
+        setUploadStatus(`Uploading ${file.name} (${displayIndex}/${filesToUpload.length})`)
         setUploadProgress(0)
 
         try {
-          const created = await uploadCV(file, token, setUploadProgress)
+          const freshToken = await user.getIdToken()
+          const created = await uploadCV(file, freshToken, setUploadProgress)
           successCount++
           playSuccessSound()
           
@@ -207,7 +234,7 @@ export function DashboardPage() {
           })
           
           // Optionally update local list for immediate feedback
-          if (files.length === 1) {
+          if (filesToUpload.length === 1) {
             setItems((current) => [created, ...current].slice(0, filters.pageSize))
             setTotal((current) => current + 1)
             setTotalStorageBytes((current) => current + created.fileSize)
@@ -224,13 +251,13 @@ export function DashboardPage() {
 
       if (failureCount > 0) {
         setError(`Completed with issues: ${successCount} successful, ${failureCount} failed.`)
-      } else if (files.length > 1) {
+      } else if (filesToUpload.length > 1) {
         // Success message for bulk
         showToast(`Successfully uploaded ${successCount} files.`, 'success')
         setUploadStatus(`Successfully uploaded ${successCount} files.`)
       }
 
-      if (successCount > 0 && files.length > 1) {
+      if (successCount > 0 && filesToUpload.length > 1) {
         setActiveTab('library')
       } else if (successCount > 0) {
         setActiveTab('review')

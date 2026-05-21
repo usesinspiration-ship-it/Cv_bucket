@@ -27,6 +27,17 @@ export async function fetchCVs(
   return response.data
 }
 
+export async function checkDuplicates(
+  hashes: string[],
+  token: string,
+): Promise<string[]> {
+  const response = await api.post<{ duplicates: string[] }>('/cvs/check-duplicates', { hashes }, {
+    headers: authHeaders(token),
+  })
+
+  return response.data.duplicates
+}
+
 export async function uploadCV(
   file: File,
   token: string,

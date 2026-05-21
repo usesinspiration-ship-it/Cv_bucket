@@ -6,6 +6,7 @@ import {
   createCvDocument,
   deleteCvById,
   findCvByHash,
+  findCvsByHashes,
   findCvByPhone,
   getCvById,
   listCvsPaginated,
@@ -115,6 +116,23 @@ export async function uploadCv(request: Request, response: Response) {
     throw error
   }
 }
+
+const checkDuplicatesSchema = z.object({
+  hashes: z.array(z.string().min(1)),
+})
+
+export async function checkDuplicates(request: Request, response: Response) {
+  const authUser = (request as any).authUser
+  if (!authUser) {
+    throw new HttpError(401, 'Authentication required.')
+  }
+
+  const { hashes } = checkDuplicatesSchema.parse(request.body)
+  const duplicates = await findCvsByHashes(hashes)
+
+  response.json({ duplicates })
+}
+
 
 export async function listCvs(request: Request, response: Response) {
   const authUser = (request as any).authUser

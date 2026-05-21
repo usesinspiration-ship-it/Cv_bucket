@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { env } from '../config/env.js'
-import { deleteCv, getCv, listCvs, updateCv, uploadCv } from '../controllers/cvController.js'
+import { checkDuplicates, deleteCv, getCv, listCvs, updateCv, uploadCv } from '../controllers/cvController.js'
 import { requireAuth } from '../middleware/auth.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HttpError } from '../utils/httpError.js'
@@ -31,6 +31,7 @@ export const cvRouter = Router()
 
 cvRouter.use(requireAuth)
 cvRouter.get('/', asyncHandler(listCvs))
+cvRouter.post('/check-duplicates', asyncHandler(checkDuplicates))
 cvRouter.get('/:id', asyncHandler(getCv))
 cvRouter.post('/upload', upload.single('file'), asyncHandler(uploadCv))
 cvRouter.patch('/:id', asyncHandler(updateCv))
