@@ -251,13 +251,13 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
         }
       }
 
-      // 3. Send ONE bulk API call with all hashes
-      const allHashes = Array.from(hashMap.values())
+      // 3. Send ONE bulk API call with all UNIQUE hashes
+      const uniqueHashes = Array.from(new Set(hashMap.values()))
       let token = await user.getIdToken()
       let duplicateHashes: string[] = []
 
       try {
-        duplicateHashes = await checkDuplicates(allHashes, token)
+        duplicateHashes = await checkDuplicates(uniqueHashes, token)
       } catch (checkErr) {
         const checkErrMsg = getApiError(checkErr)
         if (
@@ -267,13 +267,14 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
           checkErrMsg.includes('auth/')
         ) {
           token = await user.getIdToken(true)
-          duplicateHashes = await checkDuplicates(allHashes, token)
+          duplicateHashes = await checkDuplicates(uniqueHashes, token)
         } else {
           throw checkErr
         }
       }
 
       const duplicateSet = new Set(duplicateHashes)
+      const seenHashesInBatch = new Set<string>()
 
       // 4. Instantly mark duplicates as 'skipped', rest as 'pending'
       setQueue((prev) =>
@@ -282,13 +283,30 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
           if (!hash || item.status !== 'prescreening') return item
 
           if (duplicateSet.has(hash)) {
-            return { ...item, hash, status: 'skipped' as const, progress: 100 }
+            return { ...item, hash, status: 'skipped' as const, progress: 100, error: 'Already uploaded' }
           }
+          if (seenHashesInBatch.has(hash)) {
+            return { ...item, hash, status: 'skipped' as const, progress: 100, error: 'Duplicate in selection' }
+          }
+          seenHashesInBatch.add(hash)
           return { ...item, hash, status: 'pending' as const }
         })
       )
 
-      const skippedCount = newItems.filter((item) => duplicateSet.has(hashMap.get(item.id) ?? '')).length
+      // Calculate skipped count efficiently
+      const seenHashesForCount = new Set<string>()
+      let skippedCount = 0
+      for (const item of newItems) {
+        const hash = hashMap.get(item.id)
+        if (hash) {
+          if (duplicateSet.has(hash) || seenHashesForCount.has(hash)) {
+            skippedCount++
+          } else {
+            seenHashesForCount.add(hash)
+          }
+        }
+      }
+
       if (skippedCount > 0) {
         playSuccessSound()
       }

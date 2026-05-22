@@ -110,13 +110,29 @@ export async function findCvByHash(hash: string): Promise<CvRecord | null> {
 export async function findCvsByHashes(hashes: string[]): Promise<string[]> {
   try {
     if (!hashes || hashes.length === 0) return []
-    const { data, error } = await supabase
-      .from('cvs')
-      .select('fileHash')
-      .in('fileHash', hashes)
+    
+    // Chunk hashes into safe batches of 100 to avoid GET request URI length limits in PostgREST
+    const BATCH_SIZE = 100
+    const batches: string[][] = []
+    for (let i = 0; i < hashes.length; i += BATCH_SIZE) {
+      batches.push(hashes.slice(i, i + BATCH_SIZE))
+    }
 
-    if (error) throw error
-    return (data || []).map((row: any) => row.fileHash)
+    const results = await Promise.all(
+      batches.map(async (batch) => {
+        const { data, error } = await supabase
+          .from('cvs')
+          .select('fileHash')
+          .in('fileHash', batch)
+
+        if (error) throw error
+        return (data || []).map((row: any) => row.fileHash)
+      })
+    )
+
+    // Flatten results and return unique hashes
+    const foundHashes = results.flat()
+    return Array.from(new Set(foundHashes))
   } catch (error) {
     console.error('Error finding CVs by hashes from Supabase:', error)
     return []
