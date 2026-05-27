@@ -1,7 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto'
 import type { Request, Response } from 'express'
 import { z } from 'zod'
-import { env } from '../config/env.js'
 import {
   createCvDocument,
   deleteCvById,
@@ -145,12 +144,13 @@ export async function listCvs(request: Request, response: Response) {
   const filters = listQuerySchema.parse(request.query)
   const forceRefresh = (request.query as any).refresh === 'true'
 
-  // Get user-specific or global limit
+  // Get user-specific limit. A value of 0 means NO LIMIT (unlimited access).
   let limit = 0
   if (!isAdmin) {
     const userSpecificLimit = authUser.viewLimit
-    const globalLimit = env.USER_VIEW_LIMIT
-    limit = userSpecificLimit > 0 ? userSpecificLimit : globalLimit
+    if (userSpecificLimit > 0) {
+      limit = userSpecificLimit
+    }
   }
 
   // If a limit is active, verify if requested page/offset is beyond the limit
