@@ -144,30 +144,52 @@ export async function listCvs(request: Request, response: Response) {
   const { isAdmin } = authUser
   const filters = listQuerySchema.parse(request.query)
   const forceRefresh = (request.query as any).refresh === 'true'
-  const { items: allViewable, total: filteredCount, totalStorageBytes: libraryTotalSize } = await listCvsPaginated(filters, forceRefresh)
 
-  // Apply limit for non-admins
-  let viewable = allViewable
-  let isLimited = false
-
+  // Get user-specific or global limit
+  let limit = 0
   if (!isAdmin) {
     const userSpecificLimit = authUser.viewLimit
     const globalLimit = env.USER_VIEW_LIMIT
-    
-    // Use user-specific limit if set (> 0), otherwise use global default
-    const limit = userSpecificLimit > 0 ? userSpecificLimit : globalLimit
-    
-    if (limit > 0) {
-      if (allViewable.length > limit) {
-        viewable = allViewable.slice(0, limit)
-        isLimited = true
-      }
+    limit = userSpecificLimit > 0 ? userSpecificLimit : globalLimit
+  }
+
+  // If a limit is active, verify if requested page/offset is beyond the limit
+  const from = (filters.page - 1) * filters.pageSize
+  if (limit > 0 && from >= limit) {
+    response.json({
+      items: [],
+      total: limit,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      totalStorageBytes: 0,
+      isLimited: true,
+      globalTotal: limit,
+    })
+    return
+  }
+
+  // Adjust page size if it crosses the limit boundary
+  const activeFilters = { ...filters }
+  let isLimited = false
+  if (limit > 0) {
+    const to = from + filters.pageSize
+    if (to > limit) {
+      activeFilters.pageSize = limit - from
+      isLimited = true
     }
   }
 
+  const { items: allViewable, total: filteredCount, totalStorageBytes: libraryTotalSize } = await listCvsPaginated(activeFilters, forceRefresh)
+
+  let totalCount = filteredCount
+  if (limit > 0 && filteredCount > limit) {
+    totalCount = limit
+    isLimited = true
+  }
+
   response.json({
-    items: await Promise.all(viewable.map((cv) => serializeCv(cv, filters.query))),
-    total: filteredCount,
+    items: await Promise.all(allViewable.map((cv) => serializeCv(cv, filters.query))),
+    total: totalCount,
     page: filters.page,
     pageSize: filters.pageSize,
     totalStorageBytes: libraryTotalSize,
