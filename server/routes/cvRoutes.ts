@@ -30,6 +30,37 @@ const upload = multer({
 export const cvRouter = Router()
 
 cvRouter.use(requireAuth)
+
+// Expose profile status endpoint (accessible to pending/suspended users to verify authorization state)
+cvRouter.get('/profile', asyncHandler(async (req: any, res) => {
+  if (!req.authUser) {
+    throw new HttpError(401, 'Unauthorized')
+  }
+  res.json({
+    uid: req.authUser.uid,
+    email: req.authUser.email || '',
+    displayName: req.authUser.name || '',
+    photoURL: req.authUser.picture || '',
+    isAdmin: req.authUser.isAdmin,
+    role: req.authUser.role || 'user',
+    status: req.authUser.status || 'active',
+  })
+}))
+
+// Middleware to ensure user status is 'active' for all subsequent data read/write endpoints
+const requireActiveUser = (req: any, res: any, next: any) => {
+  if (req.authUser?.status !== 'active') {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Access restricted. Ask developer to allow you.',
+      status: req.authUser?.status || 'pending'
+    })
+  }
+  next()
+}
+
+cvRouter.use(requireActiveUser)
+
 cvRouter.get('/', asyncHandler(listCvs))
 cvRouter.post('/check-duplicates', asyncHandler(checkDuplicates))
 cvRouter.get('/:id', asyncHandler(getCv))

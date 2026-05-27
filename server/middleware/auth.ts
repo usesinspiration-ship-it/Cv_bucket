@@ -82,7 +82,7 @@ export async function requireAuth(request: Request, _response: Response, next: N
           displayName: decodedToken.name || '',
           photoURL: decodedToken.picture || '',
           role: profile?.role || (isConfiguredAdmin ? 'admin' : 'user'),
-          status: profile?.status || 'active',
+          status: profile?.status || (isConfiguredAdmin ? 'active' : 'pending'),
           permissions: {
             canUpload: true,
             canDownload: true,
@@ -109,6 +109,8 @@ export async function requireAuth(request: Request, _response: Response, next: N
     request.authUser = {
       ...decodedToken,
       isAdmin,
+      role: profile?.role || (isAdmin ? 'admin' : 'user'),
+      status: profile?.status || 'active',
       viewLimit: profile?.viewLimit || 0, // 0 means use global fallback
     }
     next()

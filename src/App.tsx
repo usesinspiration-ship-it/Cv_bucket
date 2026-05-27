@@ -7,13 +7,13 @@ import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 
 function App() {
-  const { loading, configError } = useAuth()
+  const { loading, profileLoading, user, configError } = useAuth()
 
   if (configError) {
     return <ConfigurationErrorScreen message={configError} />
   }
 
-  if (loading) {
+  if (loading || (user && profileLoading)) {
     return <LoadingScreen message="Preparing your CV workspace..." />
   }
 
