@@ -74,6 +74,10 @@ export async function uploadCv(request: Request, response: Response) {
       throw new HttpError(400, 'The CV could not be parsed (empty content). Please ensure the file is not corrupted, encrypted, or an image-only PDF.')
     }
 
+    if (!parsed.isResume) {
+      throw new HttpError(400, `Upload rejected: The file does not appear to be a valid resume or CV. ${parsed.invalidReason || ''}`)
+    }
+
     // Check if this phone number already exists
     if (parsed.phone) {
       const phoneStr = String(parsed.phone)

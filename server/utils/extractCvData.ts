@@ -8,6 +8,8 @@ interface ExtractedCvData {
   rawText: string
   salary: string
   location: string
+  isResume: boolean
+  invalidReason: string
 }
 
 const commonSkills = [
@@ -89,17 +91,41 @@ export function extractCvData(rawText: string): ExtractedCvData {
   const experience = extractSection(normalizedText, sectionTitles.experience)
   const education = extractSection(normalizedText, sectionTitles.education)
   const skillsSection = extractSection(normalizedText, sectionTitles.skills)
+  const skills = extractSkills(normalizedText, skillsSection)
+
+  const wordCount = normalizedText.split(/\s+/).filter(Boolean).length
+  const hasContact = !!email || !!phone
+  const hasSections = !!experience || !!education || skills.length > 0
+
+  let isResume = true
+  let invalidReason = ''
+
+  if (wordCount < 40) {
+    isResume = false
+    invalidReason = 'Document contains too little text to be a valid resume.'
+  } else if (wordCount > 15000) {
+    isResume = false
+    invalidReason = 'Document is too long to be a valid resume.'
+  } else if (!hasContact) {
+    isResume = false
+    invalidReason = 'No email or phone number detected in the document.'
+  } else if (!hasSections) {
+    isResume = false
+    invalidReason = 'No standard resume sections (experience, education, or skills) detected.'
+  }
 
   return {
     name: extractName(lines, email),
     email,
     phone,
-    skills: extractSkills(normalizedText, skillsSection),
+    skills,
     experience,
     education,
     rawText: normalizedText,
     salary: extractSalary(normalizedText),
     location: extractLocation(normalizedText, lines),
+    isResume,
+    invalidReason,
   }
 }
 

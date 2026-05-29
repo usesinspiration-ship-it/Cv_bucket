@@ -41,6 +41,8 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     Extract professional details from the following resume text. 
     
     Extraction Rules:
+    - isResume: Boolean (Set to true only if this text represents a professional resume, CV, biodata, or portfolio. Set to false if it is a general document like a lease agreement, utility bill, ticket, receipt, cover letter, book chapter, project document, invoice, ID card, or unrelated text.)
+    - invalidReason: String (If isResume is false, provide a short 1-sentence reason why it is not a resume)
     - name: Full name (usually at the very top)
     - email: Email address
     - phone: Phone number
@@ -130,6 +132,8 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
 function logAndReturn(aiData: any, rawText: string, provider: string) {
   // Normalize AI data to ensure no nulls are passed to the database
   const normalized = {
+    isResume: typeof aiData.isResume === 'boolean' ? aiData.isResume : true,
+    invalidReason: String(aiData.invalidReason || '').trim(),
     name: String(aiData.name || '').trim(),
     email: String(aiData.email || '').trim(),
     phone: String(aiData.phone || '').trim(),
