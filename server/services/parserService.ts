@@ -12,6 +12,7 @@ const groq = env.GROQ_API_KEY ? new Groq({ apiKey: env.GROQ_API_KEY }) : null
 export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?: string) {
   console.log(`[Parser] Processing file: ${fileName || 'unknown'} (${mimetype || 'unknown type'})...`)
   let text = ''
+  let isPdfFailed = false
 
   const isDocx =
     mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -49,6 +50,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     } catch (pdfError) {
       console.warn('⚠️ [Parser] pdfjs-dist failed to parse PDF (possibly corrupted or image-only):', (pdfError as Error).message)
       text = '' // Fallback to empty string, let the controller handle it gracefully
+      isPdfFailed = true
     }
   }
 
@@ -79,7 +81,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
   // ─── Tiered AI Strategy ──────────────────────────────────────────────────
   
   // Tier 1: Groq Instant (Llama 3.1 8B) - 14.4k limit
-  if (groq) {
+  if (groq && !isPdfFailed && text.trim().length > 0) {
     try {
       console.log('⚡ [Parser] Tier 1: Attempting Groq Instant (Llama 3.1 8B)...')
       const completion = await groq.chat.completions.create({
@@ -127,18 +129,50 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
 
   // Tier 4: Gemini (Fallback)
   try {
-    console.log('♊ [Parser] Tier 4: Attempting Gemini extraction...')
     const model = genAI.getGenerativeModel({ 
       model: 'gemini-1.5-flash', // Corrected model name
       generationConfig: { responseMimeType: 'application/json' }
     })
 
-    const result = await model.generateContent(prompt)
-    const responseText = result.response.text()
-    const jsonString = responseText.replace(/```json|```/g, '').trim()
-    const aiData = JSON.parse(jsonString)
+    if (isPdfFailed && mimetype === 'application/pdf') {
+      console.log('♊ [Parser] Tier 4: Local parsing failed. Attempting Gemini native PDF extraction...')
+      const multimodalPrompt = `
+        Extract professional details from the attached resume document. 
+        
+        Extraction Rules:
+        - isResume: Boolean (Set to true only if this document represents a professional resume, CV, biodata, or portfolio. Set to false if it is a general document like a lease agreement, utility bill, ticket, receipt, cover letter, book chapter, project document, invoice, ID card, or unrelated text.)
+        - invalidReason: String (If isResume is false, provide a short 1-sentence reason why it is not a resume)
+        - name: Full name (usually at the very top)
+        - email: Email address
+        - phone: Phone number
+        - skills: Array of top 10-15 technical skills or core competencies
+        - experience: A concise summary of work history (2-3 sentences max)
+        - education: A concise summary of educational background
+        - salary: Any mentioned current salary or CTC (or empty string if not found)
+        - location: Find ANY mention of a city, town, or residence.
+        - rawText: String (The complete, raw text content of the entire document extracted as a single string. This is extremely important.)
+        
+        Return the data strictly in JSON format.
+      `
+      const result = await model.generateContent([
+        { inlineData: { data: buffer.toString('base64'), mimeType: 'application/pdf' } },
+        multimodalPrompt
+      ])
+      
+      const responseText = result.response.text()
+      const jsonString = responseText.replace(/```json|```/g, '').trim()
+      const aiData = JSON.parse(jsonString)
+      
+      return logAndReturn(aiData, aiData.rawText || '', 'Gemini-Vision')
+    } else {
+      console.log('♊ [Parser] Tier 4: Attempting standard Gemini text extraction...')
+      const result = await model.generateContent(prompt)
+      const responseText = result.response.text()
+      const jsonString = responseText.replace(/```json|```/g, '').trim()
+      const aiData = JSON.parse(jsonString)
 
-    return logAndReturn(aiData, text, 'Gemini')
+      return logAndReturn(aiData, text, 'Gemini')
+    }
   } catch (error) {
     console.error('❌ [Parser] All AI Tiers failed, falling back to regex extraction:', (error as any).message)
     const fallbackData = extractCvData(text)
