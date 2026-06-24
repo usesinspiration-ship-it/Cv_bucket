@@ -1,4 +1,4 @@
-import pdfParse from 'pdf-parse'
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 import mammoth from 'mammoth'
 import WordExtractor from 'word-extractor'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -29,9 +29,27 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     const doc = await extractor.extract(buffer)
     text = doc.getBody()
   } else {
-    // PDF or fallback
-    const parsed = await pdfParse(buffer)
-    text = parsed.text
+    // PDF using robust pdfjs-dist
+    try {
+      const data = new Uint8Array(buffer)
+      const loadingTask = pdfjsLib.getDocument({ 
+        data, 
+        useSystemFonts: true 
+      })
+      const pdfDocument = await loadingTask.promise
+      
+      let extractedText = ''
+      for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+        const page = await pdfDocument.getPage(pageNum)
+        const textContent = await page.getTextContent()
+        const pageText = textContent.items.map((item: any) => item.str).join(' ')
+        extractedText += pageText + '\n'
+      }
+      text = extractedText
+    } catch (pdfError) {
+      console.warn('⚠️ [Parser] pdfjs-dist failed to parse PDF (possibly corrupted or image-only):', (pdfError as Error).message)
+      text = '' // Fallback to empty string, let the controller handle it gracefully
+    }
   }
 
   // Clean the text immediately (remove null bytes and other illegal Postgres characters)

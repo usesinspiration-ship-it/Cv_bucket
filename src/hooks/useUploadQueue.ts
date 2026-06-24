@@ -274,24 +274,24 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
       }
 
       const duplicateSet = new Set(duplicateHashes)
-      const seenHashesInBatch = new Set<string>()
 
       // 4. Instantly mark duplicates as 'skipped', rest as 'pending'
-      setQueue((prev) =>
-        prev.map((item) => {
+      setQueue((prev) => {
+        const localSeenHashes = new Set<string>()
+        return prev.map((item) => {
           const hash = hashMap.get(item.id)
           if (!hash || item.status !== 'prescreening') return item
 
           if (duplicateSet.has(hash)) {
             return { ...item, hash, status: 'skipped' as const, progress: 100, error: 'Already uploaded' }
           }
-          if (seenHashesInBatch.has(hash)) {
+          if (localSeenHashes.has(hash)) {
             return { ...item, hash, status: 'skipped' as const, progress: 100, error: 'Duplicate in selection' }
           }
-          seenHashesInBatch.add(hash)
+          localSeenHashes.add(hash)
           return { ...item, hash, status: 'pending' as const }
         })
-      )
+      })
 
       // Calculate skipped count efficiently
       const seenHashesForCount = new Set<string>()
