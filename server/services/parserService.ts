@@ -130,7 +130,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
   // Tier 4: Gemini (Fallback)
   try {
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash', // Corrected model name
+      model: 'gemini-2.5-flash',
       generationConfig: { responseMimeType: 'application/json' }
     })
 
