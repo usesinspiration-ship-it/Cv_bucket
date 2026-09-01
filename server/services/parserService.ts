@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import Groq from 'groq-sdk'
 import { env } from '../config/env.js'
 import { extractCvData } from '../utils/extractCvData.js'
+import { performOcrSpace } from './ocrService.js'
 
 const genAI = new GoogleGenerativeAI(env.GOOGLE_API_KEY)
 const groq = env.GROQ_API_KEY ? new Groq({ apiKey: env.GROQ_API_KEY }) : null
@@ -49,13 +50,30 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
       text = extractedText
     } catch (pdfError) {
       console.warn('⚠️ [Parser] pdfjs-dist failed to parse PDF (possibly corrupted or image-only):', (pdfError as Error).message)
-      text = '' // Fallback to empty string, let the controller handle it gracefully
+      text = ''
       isPdfFailed = true
+    }
+
+    // If PDF text extraction is empty or sparse (< 50 chars), it's likely a Canva, image, or scanned PDF
+    if (text.trim().length < 50) {
+      console.log(`📷 [Parser] Sparse or empty text layer (${text.trim().length} chars). Invoking OCR.space...`)
+      const ocrText = await performOcrSpace(buffer, mimetype || 'application/pdf', fileName)
+      if (ocrText.trim().length >= 30) {
+        console.log(`✅ [Parser] OCR.space successfully extracted ${ocrText.trim().length} characters.`)
+        text = ocrText
+        isPdfFailed = false
+      } else {
+        console.warn('⚠️ [Parser] OCR.space did not return sufficient text. Will fall back to Gemini Vision if available.')
+        if (text.trim().length === 0) {
+          isPdfFailed = true
+        }
+      }
     }
   }
 
   // Clean the text immediately (remove null bytes and other illegal Postgres characters)
   text = text.replace(/\u0000/g, '')
+
 
   const prompt = `
     Extract professional details from the following resume text. 
@@ -134,8 +152,8 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
       generationConfig: { responseMimeType: 'application/json' }
     })
 
-    if (isPdfFailed && mimetype === 'application/pdf') {
-      console.log('♊ [Parser] Tier 4: Local parsing failed. Attempting Gemini native PDF extraction...')
+    if ((isPdfFailed || text.trim().length < 30) && (mimetype === 'application/pdf' || fileName?.toLowerCase().endsWith('.pdf'))) {
+      console.log('♊ [Parser] Tier 4: Text is empty or sparse. Attempting Gemini native PDF extraction...')
       const multimodalPrompt = `
         Extract professional details from the attached resume document. 
         
