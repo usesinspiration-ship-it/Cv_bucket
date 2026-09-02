@@ -29,6 +29,15 @@ export async function performOcrSpace(
     return ''
   }
 
+  // OCR.space Free Plan has a strict 1.5MB file size limit
+  const maxBytes = 1.45 * 1024 * 1024
+  if (buffer.length > maxBytes) {
+    console.log(
+      `ℹ️ [OCR.space] File size (${(buffer.length / (1024 * 1024)).toFixed(2)} MB) exceeds OCR.space free tier limit (1.5 MB). Delegating directly to Gemini Vision.`
+    )
+    return ''
+  }
+
   try {
     console.log(`🔍 [OCR.space] Starting OCR processing for ${fileName} (${(buffer.length / 1024).toFixed(1)} KB)...`)
 
