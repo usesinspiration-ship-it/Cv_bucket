@@ -42,6 +42,7 @@ export function DashboardPage() {
   const deferredSkill = useDeferredValue(filters.skill)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [downloadingCvId, setDownloadingCvId] = useState<string | null>(null)
   const [activeTab, setActiveTabState] = useState<DashboardTab>(() => {
     try {
       const params = new URLSearchParams(window.location.search)
@@ -269,7 +270,7 @@ export function DashboardPage() {
   }
 
   async function handleDownloadCv(cv: CVRecord) {
-    if (!user) return
+    if (!user || downloadingCvId) return
     const isOwner = Boolean(cv.isOwner || cv.userId === user.uid)
     const canDownload = Boolean(isOwner || cv.canDownload || cv.hasUnlockedDownload)
 
@@ -278,17 +279,21 @@ export function DashboardPage() {
       return
     }
 
-    const currentCredits = profile?.credits ?? 10
-    if (currentCredits < 5) {
-      alert(`Insufficient coins! Downloading this CV requires 5 coins (current balance: ${currentCredits}). Please top up.`)
-      return
+    // Only prompt for 5 coins if user does NOT already own or have it unlocked
+    if (!canDownload) {
+      const currentCredits = profile?.credits ?? 10
+      if (currentCredits < 5) {
+        alert(`Insufficient coins! Downloading this CV requires 5 coins (current balance: ${currentCredits}). Please top up.`)
+        return
+      }
+
+      const confirmed = window.confirm(
+        `Download ${cv.fileName || 'this CV'} for 5 coins?\n(The uploader will receive 1 coin. You can re-download this CV unlimited times once unlocked.)`
+      )
+      if (!confirmed) return
     }
 
-    const confirmed = window.confirm(
-      `Download ${cv.fileName || 'this CV'} for 5 coins?\n(The uploader will receive 1 coin. You can re-download this CV unlimited times once unlocked.)`
-    )
-    if (!confirmed) return
-
+    setDownloadingCvId(cv.id)
     try {
       const token = await user.getIdToken()
       const res = await unlockCvDownload(cv.id, token)
@@ -310,6 +315,8 @@ export function DashboardPage() {
       }
     } catch (downloadErr) {
       setError(getApiError(downloadErr))
+    } finally {
+      setDownloadingCvId(null)
     }
   }
 
@@ -505,6 +512,7 @@ export function DashboardPage() {
                       onDelete={handleDelete}
                       onEdit={handleQuickEdit}
                       onDownload={handleDownloadCv}
+                      downloadingCvId={downloadingCvId}
                     />
                     <div className="glass-panel flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
                       <p className="text-slate-500">

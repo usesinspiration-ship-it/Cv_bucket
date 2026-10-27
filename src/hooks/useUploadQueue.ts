@@ -26,7 +26,7 @@ export interface QueueStats {
 
 const CONCURRENCY_LIMIT = 3
 const MAX_RETRIES = 3
-const HASH_BATCH_SIZE = 50
+const HASH_BATCH_SIZE = 10
 
 export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
   const { user } = useAuth()
@@ -236,18 +236,29 @@ export function useUploadQueue(onUploadSuccess?: (cv: CVRecord) => void) {
     setIsPreScreening(true)
 
     try {
-      // 2. Hash ALL files in parallel (in batches to avoid memory pressure)
+      // 2. Hash files in controlled batches to avoid browser memory pressure
       const hashMap = new Map<string, string>() // itemId -> hash
       for (let i = 0; i < newItems.length; i += HASH_BATCH_SIZE) {
         const batch = newItems.slice(i, i + HASH_BATCH_SIZE)
         const results = await Promise.all(
           batch.map(async (item) => {
-            const hash = await computeFileHash(item.file)
-            return { id: item.id, hash }
+            try {
+              if (item.file.size === 0) {
+                return { id: item.id, hash: null, error: 'File is empty (0 bytes)' }
+              }
+              const hash = await computeFileHash(item.file)
+              return { id: item.id, hash, error: null }
+            } catch {
+              return { id: item.id, hash: null, error: 'Could not read file' }
+            }
           })
         )
         for (const r of results) {
-          hashMap.set(r.id, r.hash)
+          if (r.hash) {
+            hashMap.set(r.id, r.hash)
+          } else if (r.error) {
+            updateItem(r.id, { status: 'failed', error: r.error })
+          }
         }
       }
 

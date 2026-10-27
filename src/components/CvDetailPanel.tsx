@@ -129,22 +129,24 @@ export function CvDetailPanel({ cv, autoEdit, onUpdate, onCancel }: CvDetailPane
   const handleDownload = async () => {
     if (!user || unlockingDownload) return
 
-    // If already unlocked or owned, open directly
+    // If already unlocked or owned and valid download URL is present, open directly
     if (canDownload && cv.downloadUrl) {
       window.open(cv.downloadUrl, '_blank')
       return
     }
 
-    // Check balance before prompting
-    if (userCredits < 5) {
-      setTopUpModalOpen(true)
-      return
-    }
+    // Only prompt for 5 coins if not already unlocked / owned
+    if (!canDownload) {
+      if (userCredits < 5) {
+        setTopUpModalOpen(true)
+        return
+      }
 
-    const confirmed = window.confirm(
-      `Download ${cv.fileName || 'this CV'} for 5 coins?\n(The uploader will receive 1 coin. You can re-download this CV unlimited times once unlocked.)`
-    )
-    if (!confirmed) return
+      const confirmed = window.confirm(
+        `Download ${cv.fileName || 'this CV'} for 5 coins?\n(The uploader will receive 1 coin. You can re-download this CV unlimited times once unlocked.)`
+      )
+      if (!confirmed) return
+    }
 
     setUnlockingDownload(true)
     setPanelError('')

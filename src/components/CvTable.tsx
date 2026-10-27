@@ -1,4 +1,4 @@
-import { Coins, Download, Edit2, Eye, ShieldCheck, Sparkles, Trash2 } from 'lucide-react'
+import { Coins, Download, Edit2, Eye, LoaderCircle, ShieldCheck, Sparkles, Trash2 } from 'lucide-react'
 import type { CVRecord } from '../types/cv'
 import { formatDate, formatFileSize, highlightText } from '../utils/format'
 
@@ -11,6 +11,7 @@ interface CvTableProps {
   onEdit?: (cv: CVRecord) => void
   onDoubleClick?: (cv: CVRecord) => void
   onDownload?: (cv: CVRecord) => void
+  downloadingCvId?: string | null
 }
 
 export function CvTable({
@@ -22,6 +23,7 @@ export function CvTable({
   onEdit,
   onDoubleClick,
   onDownload,
+  downloadingCvId,
 }: CvTableProps) {
   return (
     <div className="glass-panel overflow-hidden border-none shadow-panel">
@@ -109,6 +111,7 @@ export function CvTable({
                   )}
                   <button
                     type="button"
+                    disabled={downloadingCvId === cv.id}
                     onClick={() => {
                       if (onDownload) {
                         onDownload(cv)
@@ -124,7 +127,13 @@ export function CvTable({
                     title={canDownload ? 'Download PDF (Free/Unlocked)' : 'Download PDF (5 Coins)'}
                     aria-label={`Download ${cv.fileName}`}
                   >
-                    {canDownload ? <Download className="h-4 w-4" /> : <Coins className="h-4 w-4" />}
+                    {downloadingCvId === cv.id ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin text-slate-500" />
+                    ) : canDownload ? (
+                      <Download className="h-4 w-4" />
+                    ) : (
+                      <Coins className="h-4 w-4" />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -242,6 +251,7 @@ export function CvTable({
                       )}
                       <button
                         type="button"
+                        disabled={downloadingCvId === cv.id}
                         onClick={() => {
                           if (onDownload) {
                             onDownload(cv)
@@ -257,7 +267,13 @@ export function CvTable({
                         title={canDownload ? 'Download PDF (Free/Unlocked)' : 'Download PDF (5 Coins)'}
                         aria-label={`Download ${cv.fileName}`}
                       >
-                        {canDownload ? <Download className="h-4 w-4" /> : <Coins className="h-4 w-4" />}
+                        {downloadingCvId === cv.id ? (
+                          <LoaderCircle className="h-4 w-4 animate-spin text-slate-500" />
+                        ) : canDownload ? (
+                          <Download className="h-4 w-4" />
+                        ) : (
+                          <Coins className="h-4 w-4" />
+                        )}
                       </button>
                       <button
                         type="button"
