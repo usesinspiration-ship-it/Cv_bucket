@@ -102,44 +102,65 @@ export function UploadCard({
 
         {queue.length === 0 ? (
           /* Empty / Drag & Drop State */
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => inputRef.current?.click()}
-            onDragOver={(event) => {
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                inputRef.current?.click()
+              }
+            }}
+            onDragEnter={(event) => {
               event.preventDefault()
+              event.stopPropagation()
               setIsDragging(true)
             }}
-            onDragLeave={() => setIsDragging(false)}
+            onDragOver={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              if (!isDragging) setIsDragging(true)
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              if (event.currentTarget.contains(event.relatedTarget as Node)) return
+              setIsDragging(false)
+            }}
             onDrop={(event) => {
               event.preventDefault()
+              event.stopPropagation()
               setIsDragging(false)
               submitFiles(event.dataTransfer.files)
             }}
-            className={`group mt-6 flex min-h-72 w-full flex-col items-center justify-center rounded-[2rem] border-2 border-dashed transition-all duration-300 relative z-10 ${
+            className={`group mt-6 flex min-h-72 w-full cursor-pointer flex-col items-center justify-center rounded-[2rem] border-2 border-dashed transition-all duration-300 relative z-10 select-none ${
               isDragging
-                ? 'border-brand-500 bg-brand-50/50 ring-4 ring-brand-500/10'
+                ? 'border-brand-500 bg-brand-50/70 ring-4 ring-brand-500/10 scale-[1.01]'
                 : 'border-slate-200 bg-slate-50/30 hover:border-brand-300 hover:bg-white hover:shadow-glow'
             }`}
           >
-            <div
-              className={`mb-4 flex h-16 w-16 items-center justify-center rounded-2xl transition-all duration-300 ${
-                isDragging
-                  ? 'scale-110 bg-brand-500 text-white'
-                  : 'bg-white text-brand-600 shadow-sm group-hover:bg-brand-50 group-hover:scale-105'
-              }`}
-            >
-              <UploadCloud className="h-8 w-8 animate-pulse-subtle" />
+            <div className="pointer-events-none flex flex-col items-center">
+              <div
+                className={`mb-4 flex h-16 w-16 items-center justify-center rounded-2xl transition-all duration-300 ${
+                  isDragging
+                    ? 'scale-110 bg-brand-500 text-white shadow-lg shadow-brand-500/25'
+                    : 'bg-white text-brand-600 shadow-sm group-hover:bg-brand-50 group-hover:scale-105'
+                }`}
+              >
+                <UploadCloud className="h-8 w-8 animate-pulse-subtle" />
+              </div>
+              <p className="text-lg font-black text-slate-900">
+                {isDragging ? 'Drop resumes now!' : 'Drop CVs here or click to browse'}
+              </p>
+              <p className="mt-1 text-sm text-slate-500 font-medium">
+                Drop one or thousands of resumes up to 10 MB each
+              </p>
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-inset ring-amber-200 shadow-sm">
+                🪙 Earn +1 Coin for every unique CV uploaded
+              </div>
             </div>
-            <p className="text-lg font-black text-slate-900">
-              {isDragging ? 'Drop it now!' : 'Drop CVs here or click to browse'}
-            </p>
-            <p className="mt-1 text-sm text-slate-500 font-medium">
-              Drop one or thousands of resumes up to 10 MB each
-            </p>
-            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
-              🪙 Earn +1 Coin for every unique CV uploaded
-            </div>
-          </button>
+          </div>
         ) : (
           /* Active Queue Manager Dashboard */
           <div className="mt-6 space-y-6 relative z-10">
@@ -401,11 +422,24 @@ export function UploadCard({
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  submitFiles(e.dataTransfer.files)
+                }}
                 className="w-full btn-secondary h-11 border-dashed hover:border-brand-500 hover:bg-brand-50/30 flex items-center justify-center gap-2 rounded-2xl transition-all"
               >
                 <UploadCloud className="h-4 w-4 text-slate-500 group-hover:text-brand-500" />
                 <span className="text-xs font-black uppercase tracking-wider text-slate-600">
-                  Enqueue More Files
+                  Enqueue More Files (or drop here)
                 </span>
               </button>
             </div>

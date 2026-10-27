@@ -7,13 +7,15 @@ import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 
 function App() {
-  const { loading, profileLoading, user, configError } = useAuth()
+  const { loading, profileLoading, profile, user, configError } = useAuth()
 
   if (configError) {
     return <ConfigurationErrorScreen message={configError} />
   }
 
-  if (loading || (user && profileLoading)) {
+  // Only show the blocking LoadingScreen during initial boot when profile is not loaded yet.
+  // Background profile refreshes should never unmount the dashboard.
+  if (loading || (user && profileLoading && !profile)) {
     return <LoadingScreen message="Preparing your Jobusiness workspace..." />
   }
 

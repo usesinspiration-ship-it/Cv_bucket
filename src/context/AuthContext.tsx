@@ -57,13 +57,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(Boolean(auth))
   const [profileLoading, setProfileLoading] = useState(false)
 
-  const syncProfile = useCallback(async (firebaseUser: any) => {
+  const syncProfile = useCallback(async (firebaseUser: any, isInitial = false) => {
     if (!firebaseUser) {
       setProfile(null)
       return
     }
 
-    setProfileLoading(true)
+    if (isInitial) {
+      setProfileLoading(true)
+    }
     try {
       const token = await firebaseUser.getIdToken()
       const data = await fetchProfile(token)
@@ -81,13 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null)
       setUser(null)
     } finally {
-      setProfileLoading(false)
+      if (isInitial) {
+        setProfileLoading(false)
+      }
     }
   }, [])
 
   const refreshProfile = useCallback(async () => {
     if (!auth?.currentUser) return
-    await syncProfile(auth.currentUser)
+    await syncProfile(auth.currentUser, false)
   }, [syncProfile])
 
   useEffect(() => {
@@ -98,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       if (nextUser) {
         setUser(nextUser)
-        await syncProfile(nextUser)
+        await syncProfile(nextUser, true)
       } else {
         setUser(null)
         setProfile(null)

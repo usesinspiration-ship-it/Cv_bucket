@@ -42,7 +42,42 @@ export function DashboardPage() {
   const deferredSkill = useDeferredValue(filters.skill)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<DashboardTab>('library')
+  const [activeTab, setActiveTabState] = useState<DashboardTab>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const tabParam = params.get('tab')
+      if (tabParam === 'upload' || tabParam === 'library' || tabParam === 'review') {
+        return tabParam as DashboardTab
+      }
+    } catch {}
+    return 'library'
+  })
+
+  const setActiveTab = useCallback((tab: DashboardTab) => {
+    setActiveTabState(tab)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', tab)
+      window.history.replaceState({}, '', url.toString())
+    } catch {}
+  }, [])
+
+  // Prevent browser default behavior of opening dropped files when dropped outside dropzones
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault()
+    }
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('dragover', handleDragOver)
+    window.addEventListener('drop', handleDrop)
+    return () => {
+      window.removeEventListener('dragover', handleDragOver)
+      window.removeEventListener('drop', handleDrop)
+    }
+  }, [])
+
   const [totalStorageBytes, setTotalStorageBytes] = useState(0)
   const [globalTotal, setGlobalTotal] = useState(0)
   const [isLimited, setIsLimited] = useState(false)

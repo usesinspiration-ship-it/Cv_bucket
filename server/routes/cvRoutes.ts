@@ -121,10 +121,11 @@ cvRouter.post('/credits/topup', asyncHandler(topupWalletHandler))
 
 cvRouter.get('/', asyncHandler(listCvs))
 cvRouter.post('/check-duplicates', asyncHandler(checkDuplicates))
+cvRouter.post('/upload', upload.single('file'), asyncHandler(uploadCv))
+
 cvRouter.get('/:id', asyncHandler(getCv))
 cvRouter.get('/:id/access', asyncHandler(getCvAccess))
 cvRouter.post('/:id/unlock-view', asyncHandler(unlockCvViewHandler))
 cvRouter.post('/:id/unlock-download', asyncHandler(unlockCvDownloadHandler))
-cvRouter.post('/upload', upload.single('file'), asyncHandler(uploadCv))
 cvRouter.patch('/:id', asyncHandler(updateCv))
 cvRouter.delete('/:id', asyncHandler(deleteCv))
