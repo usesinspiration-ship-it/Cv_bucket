@@ -246,20 +246,50 @@ export function DashboardPage() {
   }, [uploadQueue.isUploading])
 
   async function handleDelete(cv: CVRecord) {
-    if (!user || !window.confirm(`Delete ${cv.fileName}?`)) {
+    if (!user) return
+
+    const currentCredits = profile?.credits ?? 10
+    const isOwner = Boolean(cv.isOwner || cv.userId === user.uid)
+
+    // Strictly restrict delete if owner has 0 coins
+    if (isOwner && currentCredits < 1) {
+      alert(`Cannot delete "${cv.fileName}". You have 0 coins remaining. A minimum of 1 coin is required to revoke the upload reward.`)
+      return
+    }
+
+    const confirmMessage = isOwner
+      ? `Delete ${cv.fileName}?\n\nNote: 1 coin awarded for uploading this CV will be deducted from your balance (current: ${currentCredits} coins).`
+      : `Delete ${cv.fileName}?`
+
+    if (!window.confirm(confirmMessage)) {
       return
     }
 
     try {
       const token = await user.getIdToken()
-      await deleteCV(cv.id, token)
+      const res = await deleteCV(cv.id, token)
+
+      if (res?.currentCredits !== undefined) {
+        setCredits(res.currentCredits)
+      } else if (isOwner && profile?.credits !== undefined) {
+        setCredits(Math.max(0, profile.credits - 1))
+      }
+
       setItems((current) => current.filter((item) => item.id !== cv.id))
       setTotal((current) => Math.max(0, current - 1))
       setTotalStorageBytes((current) => Math.max(0, current - cv.fileSize))
       setSelectedCv((current) => (current?.id === cv.id ? null : current))
+      showToast(
+        isOwner
+          ? `Deleted "${cv.fileName}". 1 coin deducted.`
+          : `Deleted "${cv.fileName}".`,
+        'info'
+      )
       await loadCVs()
     } catch (deleteError) {
-      setError(getApiError(deleteError))
+      const msg = getApiError(deleteError)
+      setError(msg)
+      showToast(msg, 'error')
     }
   }
 

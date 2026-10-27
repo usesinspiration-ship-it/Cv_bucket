@@ -15,6 +15,7 @@ export interface CreditTransaction {
     | 'download_reward'
     | 'topup_dummy'
     | 'topup_gateway'
+    | 'delete_deduction'
   cvId?: string
   targetUserId?: string
   description: string
@@ -448,6 +449,76 @@ export async function rewardCvUpload(
   ])
 
   return newCredits
+}
+
+/**
+ * Deducts 1 coin when an owner deletes their uploaded CV.
+ * Strictly throws 402 if the user has 0 coins.
+ */
+export async function deductCvDeleteReward(
+  uid: string,
+  cvId: string,
+  fileName: string
+): Promise<number> {
+  const currentCredits = await getUserCredits(uid)
+  if (currentCredits < UPLOAD_REWARD) {
+    throw new HttpError(
+      402,
+      `Cannot delete "${fileName}". You have 0 coins remaining. A minimum of 1 coin is required to revoke the upload reward.`
+    )
+  }
+
+  const newCredits = currentCredits - UPLOAD_REWARD
+
+  await Promise.all([
+    supabase
+      .from('user_credits')
+      .update({ credits: newCredits, updated_at: new Date().toISOString() })
+      .eq('user_id', uid),
+    supabase.from('credit_transactions').insert({
+      id: randomUUID(),
+      user_id: uid,
+      amount: -UPLOAD_REWARD,
+      balance_after: newCredits,
+      type: 'delete_deduction',
+      cv_id: cvId,
+      description: `Deducted 1 coin for deleting CV: ${fileName}`,
+      created_at: new Date().toISOString(),
+    }),
+  ])
+
+  return newCredits
+}
+
+/**
+ * Claws back 1 coin from owner if an admin deletes their CV for moderation.
+ * Clamps to 0 if owner has 0 coins without blocking the admin.
+ */
+export async function clawbackOwnerUploadRewardOnAdminDelete(
+  ownerUid: string,
+  cvId: string,
+  fileName: string
+): Promise<void> {
+  const currentCredits = await getUserCredits(ownerUid)
+  const deduction = Math.min(currentCredits, UPLOAD_REWARD)
+  const newCredits = currentCredits - deduction
+
+  await Promise.all([
+    supabase
+      .from('user_credits')
+      .update({ credits: newCredits, updated_at: new Date().toISOString() })
+      .eq('user_id', ownerUid),
+    supabase.from('credit_transactions').insert({
+      id: randomUUID(),
+      user_id: ownerUid,
+      amount: -deduction,
+      balance_after: newCredits,
+      type: 'delete_deduction',
+      cv_id: cvId,
+      description: `Deducted 1 coin for admin deletion of CV: ${fileName}`,
+      created_at: new Date().toISOString(),
+    }),
+  ])
 }
 
 /**

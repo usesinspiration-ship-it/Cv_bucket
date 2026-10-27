@@ -82,10 +82,11 @@ export async function updateCV(
   return response.data
 }
 
-export async function deleteCV(id: string, token: string): Promise<void> {
-  await api.delete(`/cvs/${id}`, {
+export async function deleteCV(id: string, token: string): Promise<{ success: boolean; currentCredits?: number }> {
+  const response = await api.delete<{ success: boolean; currentCredits?: number }>(`/cvs/${id}`, {
     headers: authHeaders(token),
   })
+  return response.data
 }
 
 export async function getCvAccess(id: string, token: string): Promise<CvAccessResponse> {

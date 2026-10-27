@@ -23,6 +23,8 @@ import { HttpError } from '../utils/httpError.js'
 import { computeRelevancy } from '../utils/ftsQueryBuilder.js'
 import {
   checkCvAccess,
+  clawbackOwnerUploadRewardOnAdminDelete,
+  deductCvDeleteReward,
   getBatchCvAccess,
   getCreditTransactions,
   getUserCredits,
@@ -372,10 +374,20 @@ export async function deleteCv(request: Request, response: Response) {
     throw new HttpError(403, 'You do not have permission to delete this CV.')
   }
 
+  // Deduct 1 upload reward coin upon deletion. Restrict delete if owner balance is 0.
+  let newCredits: number
+  if (isOwner) {
+    newCredits = await deductCvDeleteReward(authUser.uid, cv.id, cv.fileName)
+  } else {
+    // Admin moderation delete: deduct from uploader if possible, but never block admin
+    await clawbackOwnerUploadRewardOnAdminDelete(cv.userId, cv.id, cv.fileName).catch(() => undefined)
+    newCredits = await getUserCredits(authUser.uid)
+  }
+
   await deletePdfFromR2(cv.objectKey)
   await deleteCvById(cv.id)
 
-  response.status(204).send()
+  response.status(200).json({ success: true, currentCredits: newCredits })
 }
 
 async function serializeCv(cv: CvRecord, query?: string, access?: UserCvAccess) {
