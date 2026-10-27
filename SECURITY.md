@@ -1,6 +1,6 @@
 # Security Best Practices
 
-This document outlines how to handle credentials and sensitive information in the CV Bucket project.
+This document outlines how to handle credentials and sensitive information in the Jobusiness project.
 
 ## Local Development
 

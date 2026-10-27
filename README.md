@@ -1,6 +1,6 @@
-# CV Bucket
+# Jobusiness
 
-CV Bucket is a full-stack CV indexing and search platform built with Vite, React, TypeScript, Tailwind CSS, Firebase Authentication, Firestore, Cloudflare R2, and an Express API. Recruiters can upload PDF resumes, parse them into structured data, store metadata securely, and search candidates by skill, name, or keyword.
+Jobusiness is a full-stack CV indexing and search platform built with Vite, React, TypeScript, Tailwind CSS, Firebase Authentication, Firestore, Cloudflare R2, and an Express API. Recruiters can upload PDF resumes, parse them into structured data, store metadata securely, and search candidates by skill, name, or keyword.
 
 ## Stack
 

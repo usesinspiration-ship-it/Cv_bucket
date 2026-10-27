@@ -1,8 +1,10 @@
 import { Router } from 'express'
 import multer from 'multer'
+import { getFirestore } from 'firebase-admin/firestore'
 import { env } from '../config/env.js'
 import { checkDuplicates, deleteCv, getCv, listCvs, updateCv, uploadCv } from '../controllers/cvController.js'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, invalidateProfileCache } from '../middleware/auth.js'
+import { adminAuth } from '../services/firebaseAdmin.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HttpError } from '../utils/httpError.js'
 
@@ -39,8 +41,44 @@ cvRouter.get('/profile', asyncHandler(async (req: any, res) => {
   res.json({
     uid: req.authUser.uid,
     email: req.authUser.email || '',
-    displayName: req.authUser.name || '',
-    photoURL: req.authUser.picture || '',
+    displayName: req.authUser.displayName || req.authUser.name || '',
+    photoURL: req.authUser.photoURL || req.authUser.picture || '',
+    isAdmin: req.authUser.isAdmin,
+    role: req.authUser.role || 'user',
+    status: req.authUser.status || 'active',
+  })
+}))
+
+// Allow authenticated user to set/update their display name
+cvRouter.patch('/profile', asyncHandler(async (req: any, res) => {
+  if (!req.authUser) {
+    throw new HttpError(401, 'Unauthorized')
+  }
+  const { displayName } = req.body || {}
+  if (typeof displayName !== 'string' || !displayName.trim()) {
+    throw new HttpError(400, 'displayName must be a non-empty string')
+  }
+  const trimmed = displayName.trim()
+  const db = getFirestore()
+  const userDocRef = db.collection('users').doc(req.authUser.uid)
+  await userDocRef.set({ displayName: trimmed }, { merge: true })
+
+  // Invalidate profile cache so fresh data is read
+  invalidateProfileCache(req.authUser.uid)
+
+  if (adminAuth) {
+    try {
+      await adminAuth.updateUser(req.authUser.uid, { displayName: trimmed })
+    } catch (authErr) {
+      console.warn('[Profile] Failed to update Firebase Auth displayName:', authErr)
+    }
+  }
+
+  res.json({
+    uid: req.authUser.uid,
+    email: req.authUser.email || '',
+    displayName: trimmed,
+    photoURL: req.authUser.photoURL || req.authUser.picture || '',
     isAdmin: req.authUser.isAdmin,
     role: req.authUser.role || 'user',
     status: req.authUser.status || 'active',

@@ -14,7 +14,7 @@ function App() {
   }
 
   if (loading || (user && profileLoading)) {
-    return <LoadingScreen message="Preparing your CV workspace..." />
+    return <LoadingScreen message="Preparing your Jobusiness workspace..." />
   }
 
   return (

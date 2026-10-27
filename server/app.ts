@@ -12,7 +12,12 @@ export const app = express()
 
 // ─── Allowed Origins ──────────────────────────────────────────────────────────
 // Always include the production domain. CLIENT_ORIGIN may add more (comma-separated).
-const ALWAYS_ALLOWED = ['https://jkfenesta.com', 'https://www.jkfenesta.com']
+const ALWAYS_ALLOWED = [
+  'https://jobusiness.in',
+  'https://www.jobusiness.in',
+  'https://jkfenesta.com',
+  'https://www.jkfenesta.com',
+]
 
 const allowedOrigins = new Set<string>([
   ...ALWAYS_ALLOWED,
@@ -76,7 +81,7 @@ app.use((req, _res, next) => {
 app.get('/api/health', (_request, response) => {
   response.json({
     ok: true,
-    service: 'cv-bucket-api',
+    service: 'jobusiness-api',
   })
 })
 

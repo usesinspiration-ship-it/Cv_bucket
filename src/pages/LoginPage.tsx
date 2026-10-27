@@ -4,6 +4,7 @@ import {
   LockKeyhole,
   Mail,
   SearchCheck,
+  User,
   UserRoundSearch,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -15,6 +16,7 @@ type AuthMode = 'login' | 'register'
 export function LoginPage() {
   const { user, login, register, loginWithGoogle } = useAuth()
   const [mode, setMode] = useState<AuthMode>('login')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,7 +35,7 @@ export function LoginPage() {
       if (mode === 'login') {
         await login(email, password)
       } else {
-        await register(email, password)
+        await register(email, password, name)
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Authentication failed.')
@@ -54,7 +56,7 @@ export function LoginPage() {
         <section className="glass-panel group overflow-hidden border-none p-10 shadow-panel transition-all duration-500 hover:shadow-glow lg:p-16">
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-500/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.2em] text-brand-700 shadow-sm ring-1 ring-inset ring-brand-500/20">
             <span className="h-2 w-2 animate-pulse rounded-full bg-brand-500" />
-            CV Bucket v2.0
+            Jobusiness v2.0
           </div>
           <h1 className="mt-8 max-w-2xl font-display text-5xl font-black leading-[1.1] tracking-tight text-slate-900 sm:text-6xl">
             Intelligent pipeline for{' '}
@@ -127,14 +129,34 @@ export function LoginPage() {
 
           <div className="mt-10">
             <h2 className="font-display text-4xl font-bold text-slate-900">
-              {mode === 'login' ? 'Welcome back.' : 'Join the elite.'}
+              {mode === 'login' ? 'Welcome back.' : 'Join Jobusiness.'}
             </h2>
             <p className="mt-3 text-sm font-medium text-slate-400">
-              Enter your credentials to access your workspace.
+              {mode === 'login'
+                ? 'Sign in with your email and password.'
+                : 'Create your account and set your name to get started.'}
             </p>
           </div>
 
           <form className="mt-10 space-y-5" onSubmit={handleSubmit}>
+            {mode === 'register' && (
+              <div className="space-y-2 animate-fade-in">
+                <label className="flex items-center gap-2 px-1 text-xs font-black uppercase tracking-wider text-slate-400">
+                  <User className="h-3.5 w-3.5" />
+                  Full Name
+                </label>
+                <input
+                  className="field"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Alex Morgan"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="flex items-center gap-2 px-1 text-xs font-black uppercase tracking-wider text-slate-400">
                 <Mail className="h-3.5 w-3.5" />
@@ -179,10 +201,10 @@ export function LoginPage() {
               {loading
                 ? mode === 'login'
                   ? 'Authenticating...'
-                  : 'Creating...'
+                  : 'Creating Account...'
                 : mode === 'login'
-                  ? 'Sign in to Dashboard'
-                  : 'Initialize Workspace'}
+                  ? 'Sign in with Email'
+                  : 'Create Account & Continue'}
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>

@@ -8,6 +8,7 @@ declare global {
         viewLimit: number
         role: string
         status: string
+        displayName?: string
       }
     }
   }

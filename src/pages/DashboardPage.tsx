@@ -260,7 +260,7 @@ export function DashboardPage() {
               </div>
               <div>
                 <h1 className="font-display text-3xl font-black tracking-tight text-slate-900">
-                  CV Bucket
+                  Jobusiness
                 </h1>
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
                   Candidate Intelligence Workspace

@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# check-env.sh - Security audit script for CV Bucket
+# check-env.sh - Security audit script for Jobusiness
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}Starting CV Bucket security audit...${NC}\n"
+echo -e "${YELLOW}Starting Jobusiness security audit...${NC}\n"
 
 # 1. Check for tracked .env files
 echo -en "1. Checking for tracked .env files... "

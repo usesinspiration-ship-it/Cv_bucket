@@ -8,6 +8,14 @@ import { HttpError } from '../utils/httpError.js'
 const profileCache = new Map<string, { profile: any; expires: number }>()
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours (Profile Cache - Manual Reset via refresh=true)
 
+export function invalidateProfileCache(uid: string) {
+  profileCache.delete(uid)
+}
+
+export function setProfileCache(uid: string, profile: any) {
+  profileCache.set(uid, { profile, expires: Date.now() + CACHE_TTL_MS })
+}
+
 // Simple in-memory rate limiting (Burst Guard)
 const requestCounts = new Map<string, { count: number; lastReset: number }>()
 
@@ -79,10 +87,10 @@ export async function requireAuth(request: Request, _response: Response, next: N
         
         const newProfile = {
           email: decodedToken.email || '',
-          displayName: decodedToken.name || '',
-          photoURL: decodedToken.picture || '',
+          displayName: decodedToken.name || profile?.displayName || '',
+          photoURL: decodedToken.picture || profile?.photoURL || '',
           role: profile?.role || (isConfiguredAdmin ? 'admin' : 'user'),
-          status: profile?.status || (isConfiguredAdmin ? 'active' : 'pending'),
+          status: profile?.status || 'active',
           permissions: {
             canUpload: true,
             canDownload: true,
@@ -97,6 +105,9 @@ export async function requireAuth(request: Request, _response: Response, next: N
         
         await userDocRef.set(newProfile, { merge: true })
         profile = { ...(profile || {}), ...newProfile }
+      } else if (decodedToken.name && !profile.displayName) {
+        await userDocRef.set({ displayName: decodedToken.name }, { merge: true })
+        profile = { ...profile, displayName: decodedToken.name }
       }
       
       // Update cache
@@ -108,6 +119,7 @@ export async function requireAuth(request: Request, _response: Response, next: N
 
     request.authUser = {
       ...decodedToken,
+      displayName: profile?.displayName || decodedToken.name || '',
       isAdmin,
       role: profile?.role || (isAdmin ? 'admin' : 'user'),
       status: profile?.status || 'active',

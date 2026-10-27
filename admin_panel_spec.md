@@ -1,6 +1,6 @@
 # Admin Panel Technical Specification & Design
 
-This document outlines the architecture, database schema, and implementation strategy for a premium Admin Panel for the CV Bucket application. This system implements Role-Based Access Control (RBAC) to manage user permissions and data visibility.
+This document outlines the architecture, database schema, and implementation strategy for a premium Admin Panel for the Jobusiness application. This system implements Role-Based Access Control (RBAC) to manage user permissions and data visibility.
 
 ## 1. Core Objectives
 - **User Management**: Lifecycle control for all application users.
