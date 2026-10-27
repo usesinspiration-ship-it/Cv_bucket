@@ -416,34 +416,36 @@ export async function rewardCvUpload(
   const currentCredits = await getUserCredits(uid)
   const newCredits = currentCredits + UPLOAD_REWARD
 
-  await supabase
-    .from('user_credits')
-    .update({ credits: newCredits, updated_at: new Date().toISOString() })
-    .eq('user_id', uid)
-
   const compositeId = `${uid}_${cvId}`
-  await supabase.from('user_unlocked_cvs').upsert(
-    {
-      id: compositeId,
-      user_id: uid,
-      cv_id: cvId,
-      unlocked_view: true,
-      unlocked_download: true,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'id' }
-  )
 
-  await supabase.from('credit_transactions').insert({
-    id: randomUUID(),
-    user_id: uid,
-    amount: UPLOAD_REWARD,
-    balance_after: newCredits,
-    type: 'upload_reward',
-    cv_id: cvId,
-    description: `Earned +1 credit for uploading CV: ${fileName}`,
-    created_at: new Date().toISOString(),
-  })
+  // Execute credit update, owner unlock upsert, and transaction audit log concurrently
+  await Promise.all([
+    supabase
+      .from('user_credits')
+      .update({ credits: newCredits, updated_at: new Date().toISOString() })
+      .eq('user_id', uid),
+    supabase.from('user_unlocked_cvs').upsert(
+      {
+        id: compositeId,
+        user_id: uid,
+        cv_id: cvId,
+        unlocked_view: true,
+        unlocked_download: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    ),
+    supabase.from('credit_transactions').insert({
+      id: randomUUID(),
+      user_id: uid,
+      amount: UPLOAD_REWARD,
+      balance_after: newCredits,
+      type: 'upload_reward',
+      cv_id: cvId,
+      description: `Earned +1 credit for uploading CV: ${fileName}`,
+      created_at: new Date().toISOString(),
+    }),
+  ])
 
   return newCredits
 }

@@ -69,17 +69,19 @@ export async function uploadCv(request: Request, response: Response) {
       throw new HttpError(400, `This CV has already been uploaded as "${existing.fileName}".`)
     }
 
-    await uploadPdfToR2({
-      key: objectKey,
-      file: request.file.buffer,
-      contentType: request.file.mimetype,
-    })
-
-    const parsed = await parseCvBuffer(
-      request.file.buffer,
-      request.file.mimetype,
-      request.file.originalname
-    )
+    // Execute R2 upload and AI resume extraction concurrently to cut upload latency in half
+    const [, parsed] = await Promise.all([
+      uploadPdfToR2({
+        key: objectKey,
+        file: request.file.buffer,
+        contentType: request.file.mimetype,
+      }),
+      parseCvBuffer(
+        request.file.buffer,
+        request.file.mimetype,
+        request.file.originalname
+      ),
+    ])
 
     if (!parsed.rawText || parsed.rawText.trim().length === 0) {
       throw new HttpError(400, 'The CV could not be parsed (empty content). Please ensure the file is not corrupted, encrypted, or an image-only PDF.')

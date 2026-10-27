@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { getFirestore } from 'firebase-admin/firestore'
 import { env } from '../config/env.js'
 import { adminAuth } from '../services/firebaseAdmin.js'
-import { ensureUserCreditsInitialized } from '../services/creditService.js'
+import { ensureUserCreditsInitialized, getUserCredits } from '../services/creditService.js'
 import { HttpError } from '../utils/httpError.js'
 
 // Simple in-memory cache for user profiles to save Firestore reads
@@ -111,18 +111,16 @@ export async function requireAuth(request: Request, _response: Response, next: N
         profile = { ...profile, displayName: decodedToken.name }
       }
       
-      // Ensure credits are initialized
-      if (typeof profile?.credits !== 'number') {
-        const initialCredits = await ensureUserCreditsInitialized(decodedToken.uid)
-        profile = { ...(profile || {}), credits: initialCredits }
-      }
+      // Ensure user credits are initialized in Supabase (10 initial credits on first login)
+      await ensureUserCreditsInitialized(decodedToken.uid)
 
-      // Update cache
+      // Update cache (profile metadata only: role, status, displayName, etc.)
       profileCache.set(decodedToken.uid, { profile, expires: now + CACHE_TTL_MS })
     }
 
     // Determine admin status (Database first, then .env fallback)
     const isAdmin = profile?.role === 'admin'
+    const liveCredits = await getUserCredits(decodedToken.uid)
 
     request.authUser = {
       ...decodedToken,
@@ -131,7 +129,7 @@ export async function requireAuth(request: Request, _response: Response, next: N
       role: profile?.role || (isAdmin ? 'admin' : 'user'),
       status: profile?.status || 'active',
       viewLimit: profile?.viewLimit || 0, // 0 means use global fallback
-      credits: typeof profile?.credits === 'number' ? profile.credits : 10,
+      credits: liveCredits,
     }
     next()
   } catch (error: any) {

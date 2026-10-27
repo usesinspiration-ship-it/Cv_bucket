@@ -9,7 +9,7 @@ declare global {
         role: string
         status: string
         displayName?: string
-        credits: number
+        credits?: number
       }
     }
   }

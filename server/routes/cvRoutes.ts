@@ -18,6 +18,7 @@ import {
 } from '../controllers/cvController.js'
 import { requireAuth, invalidateProfileCache } from '../middleware/auth.js'
 import { adminAuth } from '../services/firebaseAdmin.js'
+import { getUserCredits } from '../services/creditService.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { HttpError } from '../utils/httpError.js'
 
@@ -51,6 +52,9 @@ cvRouter.get('/profile', asyncHandler(async (req: any, res) => {
   if (!req.authUser) {
     throw new HttpError(401, 'Unauthorized')
   }
+  // Always query real-time balance from Supabase user_credits table
+  const liveCredits = await getUserCredits(req.authUser.uid)
+
   res.json({
     uid: req.authUser.uid,
     email: req.authUser.email || '',
@@ -59,7 +63,7 @@ cvRouter.get('/profile', asyncHandler(async (req: any, res) => {
     isAdmin: req.authUser.isAdmin,
     role: req.authUser.role || 'user',
     status: req.authUser.status || 'active',
-    credits: typeof req.authUser.credits === 'number' ? req.authUser.credits : 10,
+    credits: liveCredits,
   })
 }))
 
@@ -88,6 +92,8 @@ cvRouter.patch('/profile', asyncHandler(async (req: any, res) => {
     }
   }
 
+  const liveCredits = await getUserCredits(req.authUser.uid)
+
   res.json({
     uid: req.authUser.uid,
     email: req.authUser.email || '',
@@ -96,7 +102,7 @@ cvRouter.patch('/profile', asyncHandler(async (req: any, res) => {
     isAdmin: req.authUser.isAdmin,
     role: req.authUser.role || 'user',
     status: req.authUser.status || 'active',
-    credits: typeof req.authUser.credits === 'number' ? req.authUser.credits : 10,
+    credits: liveCredits,
   })
 }))
 
