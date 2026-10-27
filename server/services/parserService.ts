@@ -101,7 +101,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
   
   // Tier 1: Groq (if text is extracted and available)
   if (groq && !isPdfFailed && effectiveWordCount >= 40) {
-    const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant']
+    const groqModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound']
     for (const groqModel of groqModels) {
       try {
         console.log(`⚡ [Parser] Groq Attempt: ${groqModel}...`)
@@ -124,7 +124,7 @@ export async function parseCvBuffer(buffer: Buffer, mimetype?: string, fileName?
     (isPdfFailed || text.trim().length < 250 || effectiveWordCount < 40) &&
     (mimetype === 'application/pdf' || fileName?.toLowerCase().endsWith('.pdf'))
 
-  const geminiModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest', 'gemini-3.5-flash']
+  const geminiModels = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest']
   for (const modelName of geminiModels) {
     try {
       const model = genAI.getGenerativeModel({ 
