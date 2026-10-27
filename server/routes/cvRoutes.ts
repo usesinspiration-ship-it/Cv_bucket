@@ -2,7 +2,20 @@ import { Router } from 'express'
 import multer from 'multer'
 import { getFirestore } from 'firebase-admin/firestore'
 import { env } from '../config/env.js'
-import { checkDuplicates, deleteCv, getCv, listCvs, updateCv, uploadCv } from '../controllers/cvController.js'
+import {
+  checkDuplicates,
+  deleteCv,
+  getCv,
+  getCvAccess,
+  getWalletBalanceHandler,
+  getWalletTransactionsHandler,
+  listCvs,
+  topupWalletHandler,
+  unlockCvDownloadHandler,
+  unlockCvViewHandler,
+  updateCv,
+  uploadCv,
+} from '../controllers/cvController.js'
 import { requireAuth, invalidateProfileCache } from '../middleware/auth.js'
 import { adminAuth } from '../services/firebaseAdmin.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
@@ -46,6 +59,7 @@ cvRouter.get('/profile', asyncHandler(async (req: any, res) => {
     isAdmin: req.authUser.isAdmin,
     role: req.authUser.role || 'user',
     status: req.authUser.status || 'active',
+    credits: typeof req.authUser.credits === 'number' ? req.authUser.credits : 10,
   })
 }))
 
@@ -82,6 +96,7 @@ cvRouter.patch('/profile', asyncHandler(async (req: any, res) => {
     isAdmin: req.authUser.isAdmin,
     role: req.authUser.role || 'user',
     status: req.authUser.status || 'active',
+    credits: typeof req.authUser.credits === 'number' ? req.authUser.credits : 10,
   })
 }))
 
@@ -99,9 +114,17 @@ const requireActiveUser = (req: any, res: any, next: any) => {
 
 cvRouter.use(requireActiveUser)
 
+// Credit and wallet routes (must come before /:id)
+cvRouter.get('/credits/balance', asyncHandler(getWalletBalanceHandler))
+cvRouter.get('/credits/transactions', asyncHandler(getWalletTransactionsHandler))
+cvRouter.post('/credits/topup', asyncHandler(topupWalletHandler))
+
 cvRouter.get('/', asyncHandler(listCvs))
 cvRouter.post('/check-duplicates', asyncHandler(checkDuplicates))
 cvRouter.get('/:id', asyncHandler(getCv))
+cvRouter.get('/:id/access', asyncHandler(getCvAccess))
+cvRouter.post('/:id/unlock-view', asyncHandler(unlockCvViewHandler))
+cvRouter.post('/:id/unlock-download', asyncHandler(unlockCvDownloadHandler))
 cvRouter.post('/upload', upload.single('file'), asyncHandler(uploadCv))
 cvRouter.patch('/:id', asyncHandler(updateCv))
 cvRouter.delete('/:id', asyncHandler(deleteCv))

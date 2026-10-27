@@ -9,6 +9,7 @@ export interface UserProfile {
   isAdmin: boolean
   role: string
   status: string
+  credits: number
 }
 
 export interface AuthContextValue {
@@ -23,6 +24,7 @@ export interface AuthContextValue {
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
   updateName: (name: string) => Promise<void>
+  setCredits: (credits: number) => void
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)

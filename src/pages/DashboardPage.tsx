@@ -5,6 +5,7 @@ import { CvDetailPanel } from '../components/CvDetailPanel'
 import { CvTable } from '../components/CvTable'
 import { EmptyState } from '../components/EmptyState'
 import { ProfileMenu } from '../components/ProfileMenu'
+import { CoinBadge } from '../components/CoinBadge'
 import { SearchToolbar } from '../components/SearchToolbar'
 import { UploadCard } from '../components/UploadCard'
 import {
@@ -13,7 +14,7 @@ import {
 } from '../components/WorkspaceTabs'
 import { useAuth } from '../hooks/useAuth'
 import { useUploadQueue } from '../hooks/useUploadQueue'
-import { deleteCV, fetchCVs, getApiError } from '../services/api'
+import { deleteCV, fetchCVs, getApiError, unlockCvDownload } from '../services/api'
 import type { CVRecord, SearchFilters } from '../types/cv'
 import { formatFileSize } from '../utils/format'
 import { Toast } from '../components/Toast'
@@ -31,7 +32,7 @@ const initialFilters: SearchFilters = {
 type DashboardTab = 'library' | 'upload' | 'review'
 
 export function DashboardPage() {
-  const { user } = useAuth()
+  const { user, profile, setCredits, refreshProfile } = useAuth()
   const [items, setItems] = useState<CVRecord[]>([])
   const [total, setTotal] = useState(0)
   const [selectedCv, setSelectedCv] = useState<CVRecord | null>(null)
@@ -49,7 +50,7 @@ export function DashboardPage() {
   const [cooldownTime, setCooldownTime] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const [localHistory, setLocalHistory] = useState<{ fileName: string, fileSize: number, timestamp: string }[]>([])
-  const { toast, hideToast } = useToast()
+  const { toast, showToast, hideToast } = useToast()
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadingRef = useRef(false)
 
@@ -129,7 +130,15 @@ export function DashboardPage() {
       setTotal((current) => current + 1)
       setTotalStorageBytes((current) => current + cv.fileSize)
       setSelectedCv(cv)
-    }, [filters.pageSize])
+
+      // 3. Update coin balance (+1 coin earned for upload)
+      if ((cv as any).currentCredits !== undefined) {
+        setCredits((cv as any).currentCredits)
+      } else if (profile?.credits !== undefined) {
+        setCredits(profile.credits + 1)
+      }
+      showToast(`Uploaded "${cv.fileName}"! +1 Coin earned.`, 'success')
+    }, [filters.pageSize, profile?.credits, setCredits, showToast])
   )
 
   // Trigger a full index refresh when the upload queue finishes all items
@@ -137,10 +146,11 @@ export function DashboardPage() {
   useEffect(() => {
     if (prevIsUploadingRef.current && !uploadQueue.isUploading) {
       // Session processing completed or cancelled
+      void refreshProfile()
       void loadCVs(undefined, true)
     }
     prevIsUploadingRef.current = uploadQueue.isUploading
-  }, [uploadQueue.isUploading, loadCVs])
+  }, [uploadQueue.isUploading, loadCVs, refreshProfile])
   
   // Prevent sleep during uploads
   useWakeLock(uploadQueue.isUploading)
@@ -223,6 +233,51 @@ export function DashboardPage() {
     setActiveTab('review')
   }
 
+  async function handleDownloadCv(cv: CVRecord) {
+    if (!user) return
+    const isOwner = Boolean(cv.isOwner || cv.userId === user.uid)
+    const canDownload = Boolean(isOwner || cv.canDownload || cv.hasUnlockedDownload)
+
+    if (canDownload && cv.downloadUrl) {
+      window.open(cv.downloadUrl, '_blank')
+      return
+    }
+
+    const currentCredits = profile?.credits ?? 10
+    if (currentCredits < 5) {
+      alert(`Insufficient coins! Downloading this CV requires 5 coins (current balance: ${currentCredits}). Please top up.`)
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Download ${cv.fileName || 'this CV'} for 5 coins?\n(The uploader will receive 1 coin. You can re-download this CV unlimited times once unlocked.)`
+    )
+    if (!confirmed) return
+
+    try {
+      const token = await user.getIdToken()
+      const res = await unlockCvDownload(cv.id, token)
+      setCredits(res.currentCredits)
+      const updated: CVRecord = {
+        ...cv,
+        downloadUrl: res.downloadUrl,
+        canDownload: true,
+        canView: true,
+        hasUnlockedDownload: true,
+        hasUnlockedView: true,
+      }
+      setItems((curr) => curr.map((item) => (item.id === cv.id ? updated : item)))
+      if (selectedCv?.id === cv.id) {
+        setSelectedCv(updated)
+      }
+      if (res.downloadUrl) {
+        window.open(res.downloadUrl, '_blank')
+      }
+    } catch (downloadErr) {
+      setError(getApiError(downloadErr))
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / filters.pageSize))
 
   const tabs = useMemo<WorkspaceTabItem[]>(
@@ -269,6 +324,7 @@ export function DashboardPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <CoinBadge />
               <button
                 type="button"
                 onClick={handleManualSync}
@@ -413,6 +469,7 @@ export function DashboardPage() {
                       }}
                       onDelete={handleDelete}
                       onEdit={handleQuickEdit}
+                      onDownload={handleDownloadCv}
                     />
                     <div className="glass-panel flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
                       <p className="text-slate-500">

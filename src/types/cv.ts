@@ -18,6 +18,47 @@ export interface CVRecord {
   uploaderEmail?: string
   createdAt: string
   relevancy?: number
+  isOwner?: boolean
+  hasUnlockedView?: boolean
+  hasUnlockedDownload?: boolean
+  canView?: boolean
+  canDownload?: boolean
+}
+
+export interface CreditTransaction {
+  id: string
+  userId: string
+  amount: number
+  balanceAfter: number
+  type: string
+  cvId?: string
+  targetUserId?: string
+  description: string
+  createdAt: string
+}
+
+export interface CvAccessResponse {
+  access: {
+    isOwner: boolean
+    hasUnlockedView: boolean
+    hasUnlockedDownload: boolean
+    canView: boolean
+    canDownload: boolean
+  }
+  userCredits: number
+}
+
+export interface UnlockViewResponse {
+  cv: CVRecord
+  currentCredits: number
+  alreadyUnlocked: boolean
+}
+
+export interface UnlockDownloadResponse {
+  downloadUrl: string
+  currentCredits: number
+  alreadyUnlocked: boolean
+  ownerRewarded?: boolean
 }
 
 export interface SearchFilters {

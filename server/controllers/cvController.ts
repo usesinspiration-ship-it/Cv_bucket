@@ -21,6 +21,17 @@ import {
 } from '../services/r2Service.js'
 import { HttpError } from '../utils/httpError.js'
 import { computeRelevancy } from '../utils/ftsQueryBuilder.js'
+import {
+  checkCvAccess,
+  getBatchCvAccess,
+  getCreditTransactions,
+  getUserCredits,
+  rewardCvUpload,
+  topupCredits,
+  unlockCvDownload,
+  unlockCvView,
+  type UserCvAccess,
+} from '../services/creditService.js'
 
 const listQuerySchema = z.object({
   query: z.string().optional().default(''),
@@ -114,7 +125,21 @@ export async function uploadCv(request: Request, response: Response) {
       throw new HttpError(500, 'Failed to create CV record.')
     }
 
-    response.status(201).json(await serializeCv(created))
+    // Reward uploader with +1 credit and auto-unlock CV for owner
+    const newCredits = await rewardCvUpload(authUser.uid, created.id, created.fileName)
+
+    const ownerAccess: UserCvAccess = {
+      isOwner: true,
+      hasUnlockedView: true,
+      hasUnlockedDownload: true,
+      canView: true,
+      canDownload: true,
+    }
+
+    response.status(201).json({
+      ...(await serializeCv(created, undefined, ownerAccess)),
+      currentCredits: newCredits,
+    })
   } catch (error) {
     await deletePdfFromR2(objectKey).catch(() => undefined)
     throw error
@@ -191,8 +216,11 @@ export async function listCvs(request: Request, response: Response) {
     isLimited = true
   }
 
+  // Batch query access permissions for all items in page
+  const accessMap = await getBatchCvAccess(authUser.uid, allViewable)
+
   response.json({
-    items: await Promise.all(allViewable.map((cv) => serializeCv(cv, filters.query))),
+    items: await Promise.all(allViewable.map((cv) => serializeCv(cv, filters.query, accessMap.get(cv.id)))),
     total: totalCount,
     page: filters.page,
     pageSize: filters.pageSize,
@@ -214,10 +242,111 @@ export async function getCv(request: Request, response: Response) {
     throw new HttpError(404, 'CV not found.')
   }
 
-  // Optional: Check if non-admin can access this specific CV if it was beyond their list limit
-  // For now, we allow access if they have the ID, but listing is restricted.
+  const access = await checkCvAccess(authUser.uid, cv.id, cv.userId)
+  response.json(await serializeCv(cv, undefined, access))
+}
 
-  response.json(await serializeCv(cv))
+export async function getCvAccess(request: Request, response: Response) {
+  const authUser = (request as any).authUser
+  if (!authUser) {
+    throw new HttpError(401, 'Authentication required.')
+  }
+
+  const { id } = paramsSchema.parse(request.params)
+  const cv = await getCvById(id)
+  if (!cv) {
+    throw new HttpError(404, 'CV not found.')
+  }
+
+  const access = await checkCvAccess(authUser.uid, cv.id, cv.userId)
+  const userCredits = await getUserCredits(authUser.uid)
+
+  response.json({
+    access,
+    userCredits,
+  })
+}
+
+export async function unlockCvViewHandler(request: Request, response: Response) {
+  const authUser = (request as any).authUser
+  if (!authUser) {
+    throw new HttpError(401, 'Authentication required.')
+  }
+
+  const { id } = paramsSchema.parse(request.params)
+  const cv = await getCvById(id)
+  if (!cv) {
+    throw new HttpError(404, 'CV not found.')
+  }
+
+  const result = await unlockCvView(authUser.uid, cv.id, cv.userId, cv.name)
+  const access = await checkCvAccess(authUser.uid, cv.id, cv.userId)
+  const serialized = await serializeCv(cv, undefined, access)
+
+  response.json({
+    cv: serialized,
+    currentCredits: result.credits,
+    alreadyUnlocked: result.alreadyUnlocked,
+  })
+}
+
+export async function unlockCvDownloadHandler(request: Request, response: Response) {
+  const authUser = (request as any).authUser
+  if (!authUser) {
+    throw new HttpError(401, 'Authentication required.')
+  }
+
+  const { id } = paramsSchema.parse(request.params)
+  const cv = await getCvById(id)
+  if (!cv) {
+    throw new HttpError(404, 'CV not found.')
+  }
+
+  const result = await unlockCvDownload(authUser.uid, cv.id, cv.userId, cv.name)
+  const downloadUrl = await createDownloadUrl(cv.objectKey, cv.fileName)
+
+  response.json({
+    downloadUrl,
+    currentCredits: result.credits,
+    alreadyUnlocked: result.alreadyUnlocked,
+    ownerRewarded: result.ownerRewarded,
+  })
+}
+
+export async function getWalletBalanceHandler(request: Request, response: Response) {
+  const authUser = (request as any).authUser
+  if (!authUser) {
+    throw new HttpError(401, 'Authentication required.')
+  }
+
+  const credits = await getUserCredits(authUser.uid)
+  response.json({ credits })
+}
+
+const topupSchema = z.object({
+  amount: z.number().int().positive().max(1000),
+})
+
+export async function topupWalletHandler(request: Request, response: Response) {
+  const authUser = (request as any).authUser
+  if (!authUser) {
+    throw new HttpError(401, 'Authentication required.')
+  }
+
+  const { amount } = topupSchema.parse(request.body)
+  const result = await topupCredits(authUser.uid, amount, 'dummy')
+
+  response.json(result)
+}
+
+export async function getWalletTransactionsHandler(request: Request, response: Response) {
+  const authUser = (request as any).authUser
+  if (!authUser) {
+    throw new HttpError(401, 'Authentication required.')
+  }
+
+  const transactions = await getCreditTransactions(authUser.uid, 50)
+  response.json({ transactions })
 }
 
 export async function deleteCv(request: Request, response: Response) {
@@ -247,12 +376,35 @@ export async function deleteCv(request: Request, response: Response) {
   response.status(204).send()
 }
 
-async function serializeCv(cv: CvRecord, query?: string) {
+async function serializeCv(cv: CvRecord, query?: string, access?: UserCvAccess) {
+  const canView = access ? access.canView : true
+  const canDownload = access ? access.canDownload : true
+
   return {
     ...cv,
+    name: cv.name,
+    location: cv.location,
+    skills: cv.skills,
+    email: canView ? cv.email : 'candidate.contact@domain.com',
+    phone: canView ? cv.phone : '+91 98765 43210',
+    salary: canView ? cv.salary : '₹ 15,00,000 / year',
+    experience: canView
+      ? cv.experience
+      : 'Senior Professional • Extensive industry experience • Led cross-functional initiatives & system architectures • Managed production environments & deliverables...',
+    education: canView
+      ? cv.education
+      : 'Bachelor of Technology / Science • Premier University • Honours Degree...',
+    rawText: canView
+      ? cv.rawText
+      : 'Professional Summary: Demonstrated experience in software design, engineering, system architecture, technical leadership, database administration, and enterprise product delivery.',
     createdAt: toIsoString(cv.createdAt),
-    downloadUrl: await createDownloadUrl(cv.objectKey, cv.fileName),
+    downloadUrl: canDownload ? await createDownloadUrl(cv.objectKey, cv.fileName) : undefined,
     relevancy: query ? computeRelevancy(cv, query) : undefined,
+    isOwner: access ? access.isOwner : false,
+    hasUnlockedView: access ? access.hasUnlockedView : false,
+    hasUnlockedDownload: access ? access.hasUnlockedDownload : false,
+    canView,
+    canDownload,
   }
 }
 

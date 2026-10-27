@@ -1,5 +1,13 @@
 import axios from 'axios'
-import type { CVRecord, PaginatedCvResponse, SearchFilters } from '../types/cv'
+import type {
+  CVRecord,
+  CvAccessResponse,
+  CreditTransaction,
+  PaginatedCvResponse,
+  SearchFilters,
+  UnlockDownloadResponse,
+  UnlockViewResponse,
+} from '../types/cv'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? '/api',
@@ -78,6 +86,68 @@ export async function deleteCV(id: string, token: string): Promise<void> {
   await api.delete(`/cvs/${id}`, {
     headers: authHeaders(token),
   })
+}
+
+export async function getCvAccess(id: string, token: string): Promise<CvAccessResponse> {
+  const response = await api.get<CvAccessResponse>(`/cvs/${id}/access`, {
+    headers: authHeaders(token),
+  })
+  return response.data
+}
+
+export async function unlockCvView(id: string, token: string): Promise<UnlockViewResponse> {
+  const response = await api.post<UnlockViewResponse>(
+    `/cvs/${id}/unlock-view`,
+    {},
+    {
+      headers: authHeaders(token),
+    }
+  )
+  return response.data
+}
+
+export async function unlockCvDownload(id: string, token: string): Promise<UnlockDownloadResponse> {
+  const response = await api.post<UnlockDownloadResponse>(
+    `/cvs/${id}/unlock-download`,
+    {},
+    {
+      headers: authHeaders(token),
+    }
+  )
+  return response.data
+}
+
+export async function getWalletBalance(token: string): Promise<{ credits: number }> {
+  const response = await api.get<{ credits: number }>('/cvs/credits/balance', {
+    headers: authHeaders(token),
+  })
+  return response.data
+}
+
+export async function topupCredits(
+  amount: number,
+  token: string
+): Promise<{ credits: number; transaction: CreditTransaction }> {
+  const response = await api.post<{ credits: number; transaction: CreditTransaction }>(
+    '/cvs/credits/topup',
+    { amount },
+    {
+      headers: authHeaders(token),
+    }
+  )
+  return response.data
+}
+
+export async function getWalletTransactions(
+  token: string
+): Promise<{ transactions: CreditTransaction[] }> {
+  const response = await api.get<{ transactions: CreditTransaction[] }>(
+    '/cvs/credits/transactions',
+    {
+      headers: authHeaders(token),
+    }
+  )
+  return response.data
 }
 
 export function getApiError(error: unknown): string {

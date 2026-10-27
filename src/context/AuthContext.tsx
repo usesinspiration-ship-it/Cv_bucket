@@ -28,7 +28,11 @@ const fetchProfile = async (token: string): Promise<UserProfile> => {
     }
     throw new Error('Failed to fetch user profile')
   }
-  return res.json()
+  const data = await res.json()
+  return {
+    ...data,
+    credits: typeof data.credits === 'number' ? data.credits : 10,
+  }
 }
 
 const updateServerProfile = async (token: string, displayName: string): Promise<UserProfile> => {
@@ -265,6 +269,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
           setProfileLoading(false)
         }
+      },
+      setCredits: (credits: number) => {
+        setProfile((prev) => (prev ? { ...prev, credits } : null))
       },
     }),
     [loading, user, profile, profileLoading, refreshProfile],

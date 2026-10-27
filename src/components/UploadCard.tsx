@@ -136,6 +136,9 @@ export function UploadCard({
             <p className="mt-1 text-sm text-slate-500 font-medium">
               Drop one or thousands of resumes up to 10 MB each
             </p>
+            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
+              🪙 Earn +1 Coin for every unique CV uploaded
+            </div>
           </button>
         ) : (
           /* Active Queue Manager Dashboard */
